@@ -260,6 +260,45 @@ test("chat text over the limit is a bad message", async (t) => {
   await expectFailure(a, "bad-message", 4003);
 });
 
+test("typing relays only to the other peer and is never echoed", async (t) => {
+  const { a, b, aJoined } = await pair(t);
+
+  a.send({ t: "typing", active: true });
+
+  assert.deepEqual(await b.next(), { t: "typing", from: aJoined.peerId, active: true });
+  await a.expectNone();
+
+  a.send({ t: "typing", active: false });
+  assert.deepEqual(await b.next(), { t: "typing", from: aJoined.peerId, active: false });
+});
+
+test("typing in a one peer room is dropped", async (t) => {
+  const { connect } = await setup(t);
+  const client = await connect();
+  await joinClient(client);
+
+  client.send({ t: "typing", active: true });
+
+  await client.expectNone();
+});
+
+test("typing before join is a bad message and closes with 4003", async (t) => {
+  const { connect } = await setup(t);
+  const client = await connect();
+
+  client.send({ t: "typing", active: true });
+
+  await expectFailure(client, "bad-message", 4003);
+});
+
+test("non-boolean typing state is a bad message", async (t) => {
+  const { a } = await pair(t);
+
+  a.send({ t: "typing", active: "yes" });
+
+  await expectFailure(a, "bad-message", 4003);
+});
+
 test("signal before join is a bad message and closes with 4003", async (t) => {
   const { connect } = await setup(t);
   const client = await connect();

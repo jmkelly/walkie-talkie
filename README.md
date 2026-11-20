@@ -5,9 +5,10 @@ A low-latency voice channel for a parent and kid to talk while playing games tog
 ## What it does
 
 - Two people per room. One shares a link, the other opens it.
+- Opening the page asks for the microphone and joins the room automatically.
 - Click to talk with Space or one small Talk button. Click again to close the mic.
-- Send messages back and forth over the same room while you are connected.
-- Audio goes peer-to-peer over WebRTC. The server only handles signaling, chat relay, and static files.
+- Send messages back and forth over the same room while you are connected, with a live typing indicator.
+- Audio goes peer-to-peer over WebRTC. The server only handles signaling, chat and typing relay, and static files.
 - No accounts. The room link is the only key.
 
 ## Quick start
@@ -19,7 +20,7 @@ npm install
 npm start
 ```
 
-Open <http://localhost:8787>. Click **Start talking**, allow the microphone, then send the link to the other person. They open it and click **Start talking** too. Once they join, the message box unlocks and the Talk button turns on.
+Open <http://localhost:8787>, allow the microphone, then send the link to the other person. They open it and allow the microphone too. Once they join, the message box unlocks and the Talk button turns on.
 
 The server listens on all interfaces at port 8787. Set `PORT` or `HOST` to change that.
 
@@ -95,14 +96,14 @@ The 150 ms target is not met. The measured device path is about 155 to 162 ms, m
 npm test
 ```
 
-Runs 27 server tests. They cover room capacity, invalid codes, join and relay behavior, chat delivery and validation, close codes, peer-leave cleanup, static path traversal, health, config, and WebSocket upgrade rules.
+Runs 31 server tests. They cover room capacity, invalid codes, join and relay behavior, chat delivery and validation, typing relays, close codes, peer-leave cleanup, static path traversal, health, config, and WebSocket upgrade rules.
 
 ```sh
 npx playwright install chromium   # once
 npm run test:e2e
 ```
 
-The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them, exchanges chat messages both ways, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
+The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the typing indicator appears and clears, exchanges chat messages both ways, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
 
 ```sh
 npm run test:latency
@@ -115,12 +116,12 @@ Runs the acoustic mouth-to-ear rig. It needs a desktop session, a real microphon
 ```
 client/
   index.html    page shell, message thread, and the DOM contract
-  app.js        UI state, room URLs, WebSocket signaling, chat, click-to-talk
+  app.js        UI state, room URLs, WebSocket signaling, chat, typing, click-to-talk
   rtc.js        one audio transceiver, offer/answer, trickle ICE, stats
   audio.js      local and remote level meters
   styles.css    dark theme, messaging layout, compact talk control
 server/
-  index.js      HTTP, TLS, static files, WebSocket signaling and chat relay
+  index.js      HTTP, TLS, static files, WebSocket signaling plus chat and typing relay
   rooms.js      in-memory rooms, two peers, membership cleanup
 docs/
   CONTRACT.md   frozen protocol, DOM ids, and debug API
@@ -130,18 +131,19 @@ test/
   e2e.mjs
 ```
 
-The first person opens the page and gets a random code such as `ABCD-EFGH`. The code lives in the URL. Joining creates the room if it does not exist. When the second peer connects, the server marks one side as the offerer. The peers exchange SDP and ICE through the signaling socket, then audio flows directly between browsers.
+The first person opens the page and gets a random code such as `ABCD-EFGH`. The code lives in the URL. The page requests the microphone immediately and joins the room. When the second peer connects, the server marks one side as the offerer. The peers exchange SDP and ICE through the signaling socket, then audio flows directly between browsers.
 
-Text messages use the same signaling socket. The server trims each message, caps it at 2000 characters, and relays it to the other peer with a timestamp. Messages are never echoed to the sender and are dropped if nobody else is in the room.
+Text messages and typing state use the same signaling socket. The server trims each message, caps it at 2000 characters, and relays it to the other peer with a timestamp. Typing state is relayed as it changes and is not stored. Nothing is echoed to the sender, and both are dropped if nobody else is in the room.
 
-Rooms are in memory and disappear when the last peer leaves. The server never sees audio, never inspects SDP, and logs no room codes, addresses, or message text.
+Rooms are in memory and disappear when the last peer leaves. The server never sees audio, never inspects SDP, and logs no room codes, addresses, message text, or typing state.
 
 ## Limits
 
 - Space works only while the page has focus. A global talk key needs a native wrapper.
 - There is no voice activity detection. The mic is open or closed, never speech-gated.
 - There is no leave button or microphone-off control. Close the tab to stop capture.
-- Chat is relayed in memory and not stored. A peer who joins later sees only messages sent after they arrive, and there are no delivery receipts or typing indicators.
+- Chat is relayed in memory and not stored. A peer who joins later sees only messages sent after they arrive, and there are no delivery receipts.
+- Because the page joins on load, the browser shows the microphone prompt immediately. Some browsers block remote audio until you interact with the page; a "Tap to hear them" button appears when that happens.
 - Chat transits the signaling server, so it is not end-to-end encrypted. Use HTTPS when you are not on localhost.
 - The room code is the only access control. Anyone with the code can take the open slot. There is no join rate limiting.
 - Rooms live in one process. Running multiple servers would require shared signaling state.
@@ -152,4 +154,4 @@ Rooms are in memory and disappear when the last peer leaves. The server never se
 
 ## Status
 
-Working v1.1 with voice and text. The measured mouth-to-ear latency is about 160 ms, over the 150 ms target. The next useful steps are reducing browser audio latency, splitting the remaining pipeline delay into encode, decode, and output buffering, a global talk-key wrapper for Linux, a TURN deployment recipe with short-lived credentials, and an explicit leave control.
+Working v1.2 with voice, text, and typing state. The measured mouth-to-ear latency is about 160 ms, over the 150 ms target. The next useful steps are reducing browser audio latency, splitting the remaining pipeline delay into encode, decode, and output buffering, a global talk-key wrapper for Linux, a TURN deployment recipe with short-lived credentials, and an explicit leave control.

@@ -6,7 +6,7 @@ Walkie Talkie is a low-latency voice chat app for two people (a parent and a kid
 
 ## Current state
 
-A working v1. The stack is a dependency-free browser client (plain ES modules, no build step) plus a small Node signaling server using `ws`, with WebRTC audio peer-to-peer. `docs/CONTRACT.md` freezes the signaling protocol, DOM ids, and debug API; read it before changing any of those.
+A working v1.2. The stack is a dependency-free browser client (plain ES modules, no build step) plus a small Node signaling server using `ws`, with WebRTC audio peer-to-peer plus text chat and typing state over the signaling socket. The page asks for the mic and joins the room on load; there is no start button. `docs/CONTRACT.md` freezes the signaling protocol, DOM ids, and debug API; read it before changing any of those.
 
 - `npm start` serves the app on `http://localhost:8787`.
 - `npm test` runs server tests. `npm run test:e2e` runs the Playwright proof harness. `npm run test:latency` runs the real acoustic mouth-to-ear rig.

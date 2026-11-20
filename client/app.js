@@ -14,7 +14,6 @@ const els = {
   roomCode: document.getElementById("room-code"),
   shareLink: document.getElementById("share-link"),
   copyLink: document.getElementById("copy-link"),
-  start: document.getElementById("start"),
   status: document.getElementById("status"),
   ptt: document.getElementById("ptt"),
   pttLabel: document.getElementById("ptt-label"),
@@ -31,6 +30,8 @@ const els = {
   chatInput: document.getElementById("chat-input"),
   chatSend: document.getElementById("chat-send"),
   chatState: document.getElementById("chat-state"),
+  typing: document.getElementById("typing"),
+  sound: document.getElementById("sound"),
 };
 
 const audio = new AudioMeters();
@@ -61,6 +62,14 @@ let statsTimer = 0;
 let meterRaf = 0;
 let iceConfigPromise = null;
 let messages = [];
+let peerTyping = false;
+let peerTypingTimer = 0;
+let localTyping = false;
+let localTypingTimer = 0;
+let lastTypingSentAt = 0;
+
+const TYPING_IDLE_MS = 2000;
+const PEER_TYPING_TTL_MS = 3000;
 
 function init() {
   updateRoomUI();
@@ -80,6 +89,7 @@ function init() {
         micSettings: micTrack ? micTrack.getSettings() : null,
         chatEnabled: chatReady(),
         messageCount: messages.length,
+        peerTyping,
       };
     },
     async stats() {
@@ -117,10 +127,11 @@ function init() {
       toggleTalking();
     },
   };
+
+  onStart();
 }
 
 function wireEvents() {
-  els.start.addEventListener("click", onStart);
   els.copyLink.addEventListener("click", copyLink);
   els.retry.addEventListener("click", retryConnection);
   els.newRoom.addEventListener("click", startNewRoom);
@@ -128,18 +139,21 @@ function wireEvents() {
   els.ptt.addEventListener("click", () => toggleTalking());
   els.ptt.addEventListener("contextmenu", (event) => event.preventDefault());
   els.chatForm.addEventListener("submit", onChatSubmit);
+  els.chatInput.addEventListener("input", onChatInput);
+  els.chatInput.addEventListener("blur", () => setLocalTyping(false));
+  els.sound.addEventListener("click", enableSound);
 
   window.addEventListener("keydown", onKeyDown);
-  document.addEventListener(
-    "pointerdown",
-    () => {
-      if (els.remoteAudio.srcObject && els.remoteAudio.paused) playRemote();
-    },
-    { capture: true, passive: true },
-  );
+  document.addEventListener("pointerdown", unlockOnGesture, { capture: true, passive: true });
+  window.addEventListener("keydown", unlockOnGesture, { capture: true });
   window.addEventListener("pagehide", (event) => {
     if (!event.persisted) shutdown();
   });
+}
+
+function unlockOnGesture() {
+  audio.unlock();
+  if (els.remoteAudio.srcObject && els.remoteAudio.paused) playRemote();
 }
 
 function resolveRoom() {
@@ -198,13 +212,10 @@ function syncUI() {
   els.ptt.setAttribute("aria-label", pttAriaLabel(canTalk));
   els.pttLabel.textContent = pttLabel();
 
-  els.start.hidden = started;
-  els.start.disabled = uiState === "requesting-mic";
-  if (uiState === "requesting-mic") els.start.textContent = "Starting...";
-  else if (recovery === "start") els.start.textContent = "Try again";
-  else els.start.textContent = "Start talking";
-
-  els.retry.hidden = !(uiState === "error" && recovery === "retry");
+  els.retry.hidden = !(
+    uiState === "error" &&
+    (recovery === "mic" || recovery === "retry")
+  );
   els.newRoom.hidden = !(uiState === "error" && recovery === "new-room");
   els.stats.hidden = !live;
 
@@ -245,25 +256,26 @@ function statusText() {
 
 function liveStatusText() {
   if (talking) return "Mic is open. Click again to close it.";
-  return "Connected. Chat below or click Talk.";
+  return "Connected. Say hi or press Talk.";
 }
 
 function hintText() {
+  if (uiState === "live" && !els.sound.hidden) return "Tap the sound button to hear them.";
   if (uiState === "live") {
     if (talking) return "The mic stays open until you click again.";
     return "Click Talk or press Space. Chat anytime.";
   }
-  if (uiState === "waiting") return "The talk button and chat unlock when they join.";
-  if (uiState === "connecting") return "Setting up the audio. You can chat while it connects.";
-  if (uiState === "reconnecting") return "Your mic stays ready.";
+  if (uiState === "waiting") return "Chat and Talk unlock when they join.";
+  if (uiState === "connecting") return "Setting up the audio. Chat works now.";
+  if (uiState === "reconnecting") return "Your mic and messages stay ready.";
   if (uiState === "requesting-mic") return "Choose Allow in the browser prompt.";
   if (uiState === "error") {
-    if (recovery === "start") return "Allow the microphone in your browser, then try again.";
+    if (recovery === "mic") return "Allow the microphone in your browser, then try again.";
     if (recovery === "retry") return "Check your connection, then try again.";
     if (recovery === "new-room") return "Start a new room and send the fresh link.";
     return "";
   }
-  return "Press Start talking to allow the microphone.";
+  return "Allow the microphone in the browser prompt.";
 }
 
 function pttLabel() {
@@ -320,16 +332,85 @@ function chatReady() {
 
 function syncChat() {
   const ready = chatReady();
+  if (!ready) {
+    setLocalTyping(false);
+    setPeerTyping(false);
+  }
   els.chatInput.disabled = !ready;
   els.chatSend.disabled = !ready;
   els.chatForm.dataset.ready = ready ? "true" : "false";
   els.chatInput.placeholder = chatPlaceholder();
   els.chatState.textContent = chatStateText();
   els.chatState.dataset.state = chatStateValue();
+  if (els.chatEmpty) els.chatEmpty.textContent = chatEmptyText();
+}
+
+function setLocalTyping(active) {
+  if (!active) {
+    if (localTypingTimer) {
+      clearTimeout(localTypingTimer);
+      localTypingTimer = 0;
+    }
+    if (!localTyping) return;
+    localTyping = false;
+    lastTypingSentAt = 0;
+    sendTyping(false);
+    return;
+  }
+
+  const now = Date.now();
+  if (!localTyping) {
+    localTyping = true;
+    lastTypingSentAt = now;
+    sendTyping(true);
+    return;
+  }
+  if (now - lastTypingSentAt >= 1500) {
+    lastTypingSentAt = now;
+    sendTyping(true);
+  }
+}
+
+function sendTyping(active) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  try {
+    socket.send(JSON.stringify({ t: "typing", active }));
+  } catch {}
+}
+
+function onChatInput() {
+  if (!chatReady()) return;
+  if (els.chatInput.value.trim().length === 0) {
+    setLocalTyping(false);
+    return;
+  }
+
+  setLocalTyping(true);
+  localTypingTimer = setTimeout(() => {
+    localTypingTimer = 0;
+    setLocalTyping(false);
+  }, TYPING_IDLE_MS);
+}
+
+function setPeerTyping(active) {
+  if (peerTypingTimer) {
+    clearTimeout(peerTypingTimer);
+    peerTypingTimer = 0;
+  }
+  peerTyping = Boolean(active);
+  els.typing.hidden = !peerTyping;
+  els.chatState.hidden = peerTyping;
+
+  if (peerTyping) {
+    if (els.chatEmpty) els.chatEmpty.hidden = true;
+    peerTypingTimer = setTimeout(() => setPeerTyping(false), PEER_TYPING_TTL_MS);
+  } else if (messages.length === 0 && els.chatEmpty) {
+    els.chatEmpty.hidden = false;
+  }
 }
 
 function chatPlaceholder() {
-  if (chatReady()) return "Type a message...";
+  if (chatReady()) return "Message...";
   switch (uiState) {
     case "waiting":
       return "Waiting for the other person...";
@@ -344,6 +425,15 @@ function chatPlaceholder() {
     default:
       return "Start talking to chat.";
   }
+}
+
+function chatEmptyText() {
+  if (uiState === "live") return "No messages yet. Say hi.";
+  if (uiState === "connecting") return "Chat works while the audio connects.";
+  if (uiState === "waiting") return "Say hi when they join. Messages stay in this tab.";
+  if (uiState === "reconnecting") return "Reconnecting. Your messages will stay here.";
+  if (uiState === "error") return "Messages are unavailable right now.";
+  return "Messages stay in this tab.";
 }
 
 function chatStateText() {
@@ -366,15 +456,18 @@ function chatStateValue() {
 
 function onChatSubmit(event) {
   event.preventDefault();
+  setLocalTyping(false);
   if (!chatReady()) return;
 
   const text = els.chatInput.value.trim();
   if (!text) return;
 
+  setLocalTyping(false);
+
   try {
     socket.send(JSON.stringify({ t: "chat", text }));
   } catch {
-    flash("The message did not send. Try again.");
+    appendMessage({ system: true, text: "That message did not send. Try again.", at: Date.now() });
     return;
   }
 
@@ -387,6 +480,14 @@ function appendMessage({ from, text, at, system = false }) {
   if (typeof text !== "string" || text.length === 0) return;
 
   const time = Number.isFinite(at) ? at : Date.now();
+  const previous = messages[messages.length - 1];
+  const grouped =
+    !system &&
+    Boolean(previous) &&
+    !previous.system &&
+    previous.from === from &&
+    time - previous.at < 120_000;
+
   messages.push({ from, text, at: time, system });
   if (messages.length > MAX_MESSAGES) messages.shift();
 
@@ -397,7 +498,10 @@ function appendMessage({ from, text, at, system = false }) {
 
   const node = document.createElement("div");
   node.className = "message " + (system ? "message--system" : "message--" + from);
-  if (!system) node.dataset.from = from;
+  if (!system) {
+    node.dataset.from = from;
+    if (grouped) node.dataset.grouped = "true";
+  }
 
   const body = document.createElement("p");
   body.className = "message-text";
@@ -405,8 +509,9 @@ function appendMessage({ from, text, at, system = false }) {
   node.appendChild(body);
 
   if (!system) {
-    const meta = document.createElement("span");
+    const meta = document.createElement("time");
     meta.className = "message-meta";
+    meta.dateTime = new Date(time).toISOString();
     meta.textContent = formatMessageTime(time);
     node.appendChild(meta);
   }
@@ -426,7 +531,7 @@ function trimMessageNodes() {
 
 function formatMessageTime(ms) {
   try {
-    return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   } catch {
     return "";
   }
@@ -436,6 +541,7 @@ function clearMessages() {
   messages = [];
   for (const node of els.messages.querySelectorAll(".message")) node.remove();
   if (els.chatEmpty) els.chatEmpty.hidden = false;
+  setPeerTyping(false);
 }
 
 function isControl(target) {
@@ -538,7 +644,7 @@ function failMicrophone(message) {
   teardownPeer();
   peerId = null;
   remotePeerId = null;
-  recovery = "start";
+  recovery = "mic";
   setState("error", message);
 }
 
@@ -762,7 +868,13 @@ function handleServerMessage(raw, markJoined) {
     case "chat":
       if (typeof message.text !== "string" || message.text.length === 0) break;
       if (message.from && remotePeerId && message.from !== remotePeerId) break;
+      setPeerTyping(false);
       appendMessage({ from: "peer", text: message.text, at: Number(message.at) });
+      break;
+
+    case "typing":
+      if (message.from && remotePeerId && message.from !== remotePeerId) break;
+      setPeerTyping(message.active === true);
       break;
 
     case "peer-leave":
@@ -889,18 +1001,39 @@ function attachRemoteStream(stream) {
 }
 
 function playRemote() {
+  els.sound.hidden = true;
   const played = els.remoteAudio.play();
-  if (played && typeof played.catch === "function") played.catch(() => {});
+  if (played && typeof played.then === "function") {
+    played
+      .then(() => {
+        els.sound.hidden = true;
+        renderText();
+      })
+      .catch(() => {
+        if (els.remoteAudio.srcObject) {
+          els.sound.hidden = false;
+          renderText();
+        }
+      });
+  }
+}
+
+function enableSound() {
+  audio.unlock();
+  playRemote();
 }
 
 function teardownPeer() {
   peerGeneration += 1;
   earlySignals = [];
+  setLocalTyping(false);
+  setPeerTyping(false);
   if (peer) {
     peer.close();
     peer = null;
   }
   els.remoteAudio.srcObject = null;
+  els.sound.hidden = true;
   audio.detachRemote();
   audio.reset();
   stopStats();

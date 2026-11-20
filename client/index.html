@@ -30,7 +30,6 @@
       </div>
 
       <div class="controls">
-        <button id="start" type="button">Start talking</button>
         <button id="retry" type="button" hidden>Try again</button>
         <button id="new-room" type="button" hidden>New room</button>
       </div>
@@ -43,12 +42,20 @@
       </div>
 
       <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions">
-        <p id="chat-empty" class="chat-empty">No messages yet. When they join, say hi.</p>
+        <p id="chat-empty" class="chat-empty">Messages stay in this tab.</p>
       </div>
+
+      <span id="typing" class="typing" role="status" hidden>
+        <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span aria-hidden="true">typing</span>
+        <span class="sr-only">The other person is typing</span>
+      </span>
+
+      <button id="sound" type="button" hidden>Tap to hear them</button>
 
       <form id="chat-form" class="composer" data-ready="false">
         <label class="sr-only" for="chat-input">Message</label>
-        <input id="chat-input" name="message" type="text" maxlength="2000" autocomplete="off" enterkeyhint="send" placeholder="Start talking to chat." disabled>
+        <input id="chat-input" name="message" type="text" maxlength="2000" autocomplete="off" autocapitalize="sentences" spellcheck="true" enterkeyhint="send" placeholder="Start talking to chat." disabled>
         <button id="chat-send" type="submit" disabled>Send</button>
       </form>
     </section>
@@ -74,7 +81,7 @@
       </div>
 
       <div class="dock-meta">
-        <p id="ptt-hint" class="hint">Press Start talking to allow the microphone.</p>
+        <p id="ptt-hint" class="hint">Allow the microphone in the browser prompt.</p>
         <div id="stats" hidden></div>
       </div>
     </footer>

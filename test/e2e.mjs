@@ -203,14 +203,6 @@ async function waitForBodyState(page, expected, timeoutMs, label) {
   }
 }
 
-async function clickStart(page, label) {
-  try {
-    await page.locator('#start').click({ timeout: STEP_TIMEOUT_MS });
-  } catch (error) {
-    fail(`${label}: could not click #start: ${firstLine(error)}`);
-  }
-}
-
 async function readRoomCode(page, label) {
   let code;
   try {
@@ -258,6 +250,18 @@ async function clickTalk(page, label) {
     await page.locator('#ptt').click({ timeout: STEP_TIMEOUT_MS });
   } catch (error) {
     fail(`${label}: could not click #ptt: ${firstLine(error)}`);
+  }
+}
+
+async function waitForTyping(page, visible, label) {
+  try {
+    await page
+      .locator('#typing')
+      .waitFor({ state: visible ? 'visible' : 'hidden', timeout: STEP_TIMEOUT_MS });
+  } catch {
+    fail(
+      `${label}: typing indicator did not become ${visible ? 'visible' : 'hidden'} within ${STEP_TIMEOUT_MS} ms`,
+    );
   }
 }
 
@@ -359,8 +363,7 @@ async function main() {
 
     const a = await openContext(browser, 'A', origin);
     await a.page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: LIVE_TIMEOUT_MS });
-    await clickStart(a.page, 'A');
-    await waitForBodyState(a.page, 'waiting', LIVE_TIMEOUT_MS, 'A after #start');
+    await waitForBodyState(a.page, 'waiting', LIVE_TIMEOUT_MS, 'A after load');
     const roomCode = await readRoomCode(a.page, 'A');
     if (!(await a.page.locator('#chat-input').isDisabled())) {
       fail('A: the chat input should be disabled while waiting for a peer');
@@ -372,7 +375,6 @@ async function main() {
       waitUntil: 'load',
       timeout: LIVE_TIMEOUT_MS,
     });
-    await clickStart(b.page, 'B');
     await Promise.all([
       waitForBodyState(a.page, 'live', LIVE_TIMEOUT_MS, 'A with B'),
       waitForBodyState(b.page, 'live', LIVE_TIMEOUT_MS, 'B with A'),
@@ -384,13 +386,16 @@ async function main() {
 
     const chatHello = 'Hi! Can you hear me?';
     const chatReply = 'Loud and clear.';
-    await sendChat(a.page, chatHello, 'A');
+    await a.page.locator('#chat-input').fill(chatHello);
+    await waitForTyping(b.page, true, 'B while A types');
+    await a.page.locator('#chat-input').press('Enter');
     await waitForMessage(a.page, chatHello, 'self', 'A');
     await waitForMessage(b.page, chatHello, 'peer', 'B');
+    await waitForTyping(b.page, false, 'B after A sent');
     await sendChat(b.page, chatReply, 'B');
     await waitForMessage(b.page, chatReply, 'self', 'B');
     await waitForMessage(a.page, chatReply, 'peer', 'A');
-    console.log('A and B exchanged chat messages');
+    console.log('A and B exchanged chat messages with a typing indicator');
 
     const baselineStats = await readStats(b.page, 'B');
     const baselineBytes = Number.isFinite(baselineStats.bytesReceived) ? baselineStats.bytesReceived : 0;
@@ -455,7 +460,6 @@ async function main() {
       waitUntil: 'load',
       timeout: LIVE_TIMEOUT_MS,
     });
-    await clickStart(c.page, 'C');
     await Promise.all([
       waitForBodyState(a.page, 'live', LIVE_TIMEOUT_MS, 'A with C'),
       waitForBodyState(c.page, 'live', LIVE_TIMEOUT_MS, 'C with A'),

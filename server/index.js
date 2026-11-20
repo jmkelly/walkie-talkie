@@ -238,6 +238,16 @@ export async function startServer({ port = DEFAULT_PORT, host = DEFAULT_HOST, tl
         return;
       }
 
+      if (message.t === "typing") {
+        if (!joined) return fail(4003, "bad-message", "Join before typing.");
+        if (typeof message.active !== "boolean") {
+          return fail(4003, "bad-message", "Typing state must be a boolean.");
+        }
+        const other = otherPeer(ws);
+        if (other) send(other, { t: "typing", from: ws.peerId, active: message.active });
+        return;
+      }
+
       return fail(4003, "bad-message", "Unknown message type.");
     });
 
