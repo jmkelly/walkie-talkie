@@ -11,7 +11,8 @@
     "dev": "node --watch server/index.js",
     "test": "node --test test/",
     "test:e2e": "node test/e2e.mjs",
-    "test:latency": "node test/latency.mjs"
+    "test:latency": "node test/latency.mjs",
+    "screenshots": "node test/screenshots.mjs"
   },
   "dependencies": {
     "ws": "^8.23.0"

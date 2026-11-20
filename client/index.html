@@ -3,30 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#070a0d">
+  <meta name="theme-color" content="#080706">
   <title>Walkie Talkie</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body data-state="idle">
   <main class="app">
     <header class="topbar">
-      <h1 class="brand"><span class="brand-dot" aria-hidden="true"></span>Walkie Talkie</h1>
+      <div class="brand-lockup">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <path d="M11.5 9V4.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <circle class="mark-signal" cx="11.5" cy="3.2" r="1.6"/>
+          <rect x="6.75" y="8.75" width="14.5" height="20.5" rx="4.5" stroke="currentColor" stroke-width="2.4"/>
+          <path d="M10.5 14h7M10.5 17.5h7M10.5 21h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path class="mark-signal" d="M21.25 13.5H24a1.25 1.25 0 0 1 1.25 1.25v5.5A1.25 1.25 0 0 1 24 21.5h-2.75V13.5Z"/>
+        </svg>
+        <h1 class="brand" aria-label="Walkie Talkie">
+          <span aria-hidden="true">Walkie</span>
+          <span class="brand-accent" aria-hidden="true">Talkie</span>
+        </h1>
+      </div>
+
       <p class="room" title="Room code">
-        <span class="room-label">Room</span>
+        <span class="room-label">Channel</span>
         <span id="room-code">----</span>
+        <span class="room-lamp" aria-hidden="true"></span>
       </p>
     </header>
 
     <section class="stage" aria-label="Connection">
+      <div class="stage-head">
+        <span class="micro-label">Channel status</span>
+        <span class="stage-rule" aria-hidden="true"></span>
+      </div>
+
       <div id="status" data-state="idle" role="status" aria-live="polite">Ready when you are.</div>
 
       <div class="share">
         <div class="share-copy">
-          <span class="share-label">Send this link to the other person</span>
+          <span class="micro-label">Pairing link</span>
+          <span class="share-label">Send this to the other person</span>
           <div class="share-row">
             <code id="share-link"></code>
-            <button id="copy-link" type="button">Copy link</button>
+            <button id="copy-link" type="button">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <rect x="8" y="8" width="12" height="12" rx="2"/>
+                <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+              </svg>
+              <span>Copy link</span>
+            </button>
           </div>
         </div>
 
@@ -61,30 +88,50 @@
         <span class="sr-only">The other person is typing</span>
       </span>
 
-      <button id="sound" type="button" hidden>Tap to hear them</button>
+      <button id="sound" type="button" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 10v4h3l4 3V7L7 10H4Z"/>
+          <path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7 7 0 0 1 0 11"/>
+        </svg>
+        <span>Tap to hear them</span>
+      </button>
 
       <form id="chat-form" class="composer" data-ready="false">
         <label class="sr-only" for="chat-input">Message</label>
         <input id="chat-input" name="message" type="text" maxlength="2000" autocomplete="off" autocapitalize="sentences" spellcheck="true" enterkeyhint="send" placeholder="Start talking to chat." disabled>
-        <button id="chat-send" type="submit" disabled>Send</button>
+        <button id="chat-send" type="submit" disabled>
+          <span>Send</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M4.5 12 20 4l-3.5 16-4.8-6.2L4.5 12Z"/>
+            <path d="m11.7 13.8 8.3-9.8"/>
+          </svg>
+        </button>
       </form>
     </section>
 
     <footer class="dock">
+      <div class="dock-head">
+        <span class="micro-label">Transmit</span>
+        <span class="dock-rule" aria-hidden="true"></span>
+      </div>
+
       <button id="ptt" type="button" disabled aria-pressed="false" aria-describedby="ptt-hint">
-        <svg class="ptt-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-          <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" fill="currentColor"/>
-          <path d="M5.5 11.5a.75.75 0 0 1 1.5 0 5 5 0 0 0 10 0 .75.75 0 0 1 1.5 0 6.5 6.5 0 0 1-5.75 6.46V20h2.25a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1 0-1.5h2.25v-2.04A6.5 6.5 0 0 1 5.5 11.5Z" fill="currentColor"/>
-        </svg>
+        <span class="ptt-icon-wrap">
+          <svg class="ptt-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M12 3.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-5 0V6A2.5 2.5 0 0 1 12 3.5Z"/>
+            <path d="M6.5 10.5v.5a5.5 5.5 0 0 0 11 0v-.5M12 16.5V20M9 20h6"/>
+          </svg>
+        </span>
         <span id="ptt-label">Talk</span>
+        <span class="ptt-led" aria-hidden="true"></span>
       </button>
 
       <div class="levels">
-        <div class="level">
+        <div class="level level--local">
           <span class="level-label" aria-hidden="true">You</span>
           <div class="meter" id="local-level" aria-hidden="true"><span class="meter-fill"></span></div>
         </div>
-        <div class="level">
+        <div class="level level--remote">
           <span class="level-label" aria-hidden="true">Them</span>
           <div class="meter" id="remote-level" aria-hidden="true"><span class="meter-fill"></span></div>
         </div>

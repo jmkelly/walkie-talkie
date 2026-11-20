@@ -6,10 +6,22 @@ A low-latency voice channel for a parent and kid to talk while playing games tog
 
 - Two people per room. One shares a link or QR code, the other opens it.
 - Opening the page asks for the microphone and joins the room automatically.
-- Click to talk with Space or one small Talk button. Click again to close the mic.
+- Click to talk with Space or the Talk key. Click again to close the mic.
 - Send messages back and forth over the same room while you are connected, with a live typing indicator.
 - Audio goes peer-to-peer over WebRTC. The server only handles signaling, chat and typing relay, and static files.
 - No accounts. The room link is the only key.
+
+## Screenshots
+
+Sample room with sample messages, captured from the app with a fake microphone.
+
+| Waiting for the other person | Live, with the mic open |
+| --- | --- |
+| ![Waiting channel with a pairing link and QR code](docs/screenshots/channel-waiting.png) | ![Live channel with messages, a typing indicator, and audio meters](docs/screenshots/channel-live-desktop.png) |
+
+<p align="center">
+  <img src="docs/screenshots/channel-live-mobile.png" alt="The live channel on a phone" width="280">
+</p>
 
 ## Quick start
 
@@ -20,7 +32,7 @@ npm install
 npm start
 ```
 
-Open <http://localhost:8787>, allow the microphone, then send the link to the other person (or show them the QR code). They open it and allow the microphone too. Once they join, the message box unlocks and the Talk button turns on.
+Open <http://localhost:8787>, allow the microphone, then send the link to the other person (or show them the QR code). They open it and allow the microphone too. Once they join, the message box unlocks and the Talk key turns on.
 
 The server listens on all interfaces at port 8787. Set `PORT` or `HOST` to change that.
 
@@ -106,6 +118,12 @@ npm run test:e2e
 The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the typing indicator appears and clears, exchanges chat messages both ways, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
 
 ```sh
+npm run screenshots
+```
+
+Regenerates the README screenshots in `docs/screenshots/` at desktop and phone sizes with the same fake microphone setup. It does not touch the test proof.
+
+```sh
 npm run test:latency
 ```
 
@@ -119,16 +137,21 @@ client/
   app.js        UI state, room URLs, WebSocket signaling, chat, typing, click-to-talk
   rtc.js        one audio transceiver, offer/answer, trickle ICE, stats
   audio.js      local and remote level meters
-  styles.css    dark theme, messaging layout, compact talk control
+  mark.svg      station mark
+  favicon.svg   dark tab icon
+  qr.js         QR renderer
+  styles.css    console layout, message log, and transmit key
 server/
   index.js      HTTP, TLS, static files, WebSocket signaling plus chat and typing relay
   rooms.js      in-memory rooms, two peers, membership cleanup
 docs/
   CONTRACT.md   frozen protocol, DOM ids, and debug API
+  screenshots/  README captures
 test/
   rooms.test.js
   signaling.test.js
   e2e.mjs
+  screenshots.mjs
 ```
 
 The first person opens the page and gets a random code such as `ABCD-EFGH`. The code lives in the URL. The page requests the microphone immediately and joins the room. When the second peer connects, the server marks one side as the offerer. The peers exchange SDP and ICE through the signaling socket, then audio flows directly between browsers.
@@ -136,6 +159,10 @@ The first person opens the page and gets a random code such as `ABCD-EFGH`. The 
 Text messages and typing state use the same signaling socket. The server trims each message, caps it at 2000 characters, and relays it to the other peer with a timestamp. Typing state is relayed as it changes and is not stored. Nothing is echoed to the sender, and both are dropped if nobody else is in the room.
 
 Rooms are in memory and disappear when the last peer leaves. The server never sees audio, never inspects SDP, and logs no room codes, addresses, message text, or typing state.
+
+## Design
+
+The interface is a two-way console: a channel readout, a status rail, a running message log, and one transmit key. `PRODUCT.md` records the product point of view and the references behind it; `DESIGN.md` holds the color, type, spacing, and component rules. The app uses system fonts, one accent color, and no external assets.
 
 ## Limits
 
