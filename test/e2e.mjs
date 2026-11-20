@@ -372,6 +372,25 @@ async function main() {
     if (!(await a.page.locator('#share-qr').isVisible()) || !qrPath) {
       fail('A: the share section should show a rendered QR code while waiting');
     }
+    await a.page.setViewportSize({ width: 390, height: 700 });
+    await a.page.waitForTimeout(150);
+    const shortLayout = await a.page.evaluate(() => {
+      const visible = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element || getComputedStyle(element).display === 'none') return false;
+        return element.getBoundingClientRect().height > 0;
+      };
+      return {
+        qr: visible('#share-qr') && visible('#qr-code'),
+        messages: visible('#messages'),
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      };
+    });
+    if (!shortLayout.qr || !shortLayout.messages || shortLayout.overflow) {
+      fail(`A: short viewport lost content: ${JSON.stringify(shortLayout)}`);
+    }
+    console.log('A: the QR and message log stay visible at 390x700');
+    await a.page.setViewportSize({ width: 1280, height: 720 });
     console.log(`room ${roomCode}: A is waiting with a QR code`);
 
     const b = await openContext(browser, 'B', origin);

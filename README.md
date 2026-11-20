@@ -19,9 +19,16 @@ Sample room with sample messages, captured from the app with a fake microphone.
 | --- | --- |
 | ![Waiting channel with a pairing link and QR code](docs/screenshots/channel-waiting.png) | ![Live channel with messages, a typing indicator, and audio meters](docs/screenshots/channel-live-desktop.png) |
 
-<p align="center">
-  <img src="docs/screenshots/channel-live-mobile.png" alt="The live channel on a phone" width="280">
-</p>
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/channel-waiting-mobile.png" alt="Waiting on a phone with the pairing QR code and message log" width="260"></td>
+    <td align="center"><img src="docs/screenshots/channel-live-mobile.png" alt="The live channel on a phone" width="260"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Waiting on a phone</sub></td>
+    <td align="center"><sub>Live on a phone</sub></td>
+  </tr>
+</table>
 
 ## Quick start
 
@@ -115,7 +122,7 @@ npx playwright install chromium   # once
 npm run test:e2e
 ```
 
-The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the typing indicator appears and clears, exchanges chat messages both ways, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
+The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the QR code renders, proves a 390x700 viewport keeps the QR code and message log visible, proves the typing indicator appears and clears, exchanges chat messages both ways, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
 
 ```sh
 npm run screenshots

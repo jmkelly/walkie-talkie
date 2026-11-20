@@ -83,6 +83,12 @@ Uppercase micro-label, monospace code, and a lamp. The lamp is the only colored 
 </p>
 ```
 
+### Responsive rules
+
+- One frame. Below 940 px wide and 840 px tall, compact the header, rail, and dock instead of removing content.
+- The pairing QR and the message log stay in the DOM and visible while waiting. The share panel hides only when a peer is connected.
+- A very short window may scroll the page, but content is never hidden to make a breakpoint fit.
+
 ### Status line
 
 The rail's hero sentence. A 9 px lamp sits in a fixed first column so state changes do not move the text. Waiting and live use ink; connecting and reconnecting use muted ink with a pulse; errors use danger.

@@ -101,6 +101,24 @@ async function main() {
     await cleanFrame(a);
     await a.screenshot({ path: path.join(OUT, "channel-waiting.png") });
 
+    await a.setViewportSize({ width: 390, height: 700 });
+    await a.waitForTimeout(250);
+    const shortLayout = await a.evaluate(() => {
+      const height = (selector) => document.querySelector(selector)?.getBoundingClientRect().height ?? 0;
+      return {
+        chatVisible: getComputedStyle(document.querySelector(".chat")).display !== "none" && height("#messages") > 0,
+        qrVisible: getComputedStyle(document.querySelector("#share-qr")).display !== "none" && height("#qr-code") > 0,
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      };
+    });
+    if (!shortLayout.chatVisible || !shortLayout.qrVisible || shortLayout.overflow) {
+      throw new Error(`short viewport layout failed: ${JSON.stringify(shortLayout)}`);
+    }
+    await cleanFrame(a);
+    await a.screenshot({ path: path.join(OUT, "channel-waiting-mobile.png") });
+    await a.setViewportSize(DESKTOP);
+    await a.waitForTimeout(250);
+
     const room = (await a.locator("#room-code").textContent()).trim();
     const cb = await makeContext(browser, origin, DESKTOP, 1.5);
     const b = await cb.newPage();
