@@ -149,6 +149,7 @@ The e2e test depends on these exact ids and attributes.
 <body data-state="idle">
   <span id="room-code">ABCD-EFGH</span>
   <button id="copy-link">Copy link</button>
+  <svg id="qr-code" role="img" aria-label="QR code for the room link">...</svg>
   <div id="status" data-state="idle" role="status" aria-live="polite">...</div>
   <button id="retry" hidden>Try again</button>
   <button id="new-room" hidden>New room</button>
@@ -166,7 +167,7 @@ The e2e test depends on these exact ids and attributes.
 </body>
 ```
 
-`#status[data-state]` and `body[data-state]` share one value from `idle | requesting-mic | waiting | connecting | live | reconnecting | error`. `#status` text is short and human readable. `#room-code` is the code with the hyphen. `#copy-link` copies `location.origin + "/?room=" + code` and shows a confirmation in `#status` temporarily (then restores the real state text).
+`#status[data-state]` and `body[data-state]` share one value from `idle | requesting-mic | waiting | connecting | live | reconnecting | error`. `#status` text is short and human readable. `#room-code` is the code with the hyphen. `#copy-link` copies `location.origin + "/?room=" + code` and shows a confirmation in `#status` temporarily (then restores the real state text). `#qr-code` encodes that same URL as a scannable QR code while the share panel is visible; the link remains the source of truth for assistive tech.
 
 Chat messages render as `.message` elements. Each carries `data-from="self"` or `data-from="peer"`, with the text in a `.message-text` child. The e2e test uses these selectors. `#typing` replaces `#chat-state` while the other peer types.
 
@@ -196,7 +197,7 @@ window.__walkie = {
 
 ### Look and feel
 
-Dark, high contrast, one accent. Messaging is the primary surface: a message thread fills the page and the composer sits below it. The compact Talk control lives in a slim dock and clearly changes when the mic is open. Show a small animated typing bubble while the other person types. Show local and remote audio levels while live. Show "Waiting for the other person" with the share link while alone. Errors are plain sentences, e.g. "Microphone permission was denied. Allow it in the browser and try again." No spinners that hide state. Works at 360 px wide and on desktop. Focus states are visible. Use system fonts only.
+Dark, high contrast, one accent. Messaging is the primary surface: a message thread fills the page and the composer sits below it. The compact Talk control lives in a slim dock and clearly changes when the mic is open. Show a small animated typing bubble while the other person types. Show local and remote audio levels while live. Show "Waiting for the other person" with the share link and a small QR code while alone. Errors are plain sentences, e.g. "Microphone permission was denied. Allow it in the browser and try again." No spinners that hide state. Works at 360 px wide and on desktop. Focus states are visible. Use system fonts only.
 
 ### Errors
 

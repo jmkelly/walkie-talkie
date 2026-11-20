@@ -233,14 +233,46 @@ body[data-state="reconnecting"] .share {
 
 .share {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 16px;
   width: min(100%, 560px);
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--surface);
   text-align: left;
+}
+
+.share-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.share-qr {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.qr-code {
+  display: block;
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.share-qr-label {
+  color: var(--muted-soft);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
 }
 
 .share-label {
@@ -795,6 +827,25 @@ body[data-state="live"] .levels {
 
   .chat {
     min-height: 240px;
+  }
+}
+
+@media (max-width: 520px) {
+  .share {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .share-qr {
+    flex-direction: row;
+    align-self: flex-start;
+    gap: 10px;
+  }
+
+  .qr-code {
+    width: 84px;
+    height: 84px;
   }
 }
 

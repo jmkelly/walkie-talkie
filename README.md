@@ -4,7 +4,7 @@ A low-latency voice channel for a parent and kid to talk while playing games tog
 
 ## What it does
 
-- Two people per room. One shares a link, the other opens it.
+- Two people per room. One shares a link or QR code, the other opens it.
 - Opening the page asks for the microphone and joins the room automatically.
 - Click to talk with Space or one small Talk button. Click again to close the mic.
 - Send messages back and forth over the same room while you are connected, with a live typing indicator.
@@ -20,7 +20,7 @@ npm install
 npm start
 ```
 
-Open <http://localhost:8787>, allow the microphone, then send the link to the other person. They open it and allow the microphone too. Once they join, the message box unlocks and the Talk button turns on.
+Open <http://localhost:8787>, allow the microphone, then send the link to the other person (or show them the QR code). They open it and allow the microphone too. Once they join, the message box unlocks and the Talk button turns on.
 
 The server listens on all interfaces at port 8787. Set `PORT` or `HOST` to change that.
 

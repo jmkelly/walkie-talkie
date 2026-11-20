@@ -368,7 +368,11 @@ async function main() {
     if (!(await a.page.locator('#chat-input').isDisabled())) {
       fail('A: the chat input should be disabled while waiting for a peer');
     }
-    console.log(`room ${roomCode}: A is waiting`);
+    const qrPath = await a.page.locator('#qr-code path').getAttribute('d');
+    if (!(await a.page.locator('#share-qr').isVisible()) || !qrPath) {
+      fail('A: the share section should show a rendered QR code while waiting');
+    }
+    console.log(`room ${roomCode}: A is waiting with a QR code`);
 
     const b = await openContext(browser, 'B', origin);
     await b.page.goto(`${baseUrl}/?room=${encodeURIComponent(roomCode)}`, {

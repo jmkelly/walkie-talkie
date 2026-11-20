@@ -22,10 +22,20 @@
       <div id="status" data-state="idle" role="status" aria-live="polite">Ready when you are.</div>
 
       <div class="share">
-        <span class="share-label">Send this link to the other person</span>
-        <div class="share-row">
-          <code id="share-link"></code>
-          <button id="copy-link" type="button">Copy link</button>
+        <div class="share-copy">
+          <span class="share-label">Send this link to the other person</span>
+          <div class="share-row">
+            <code id="share-link"></code>
+            <button id="copy-link" type="button">Copy link</button>
+          </div>
+        </div>
+
+        <div id="share-qr" class="share-qr" hidden>
+          <svg id="qr-code" class="qr-code" viewBox="0 0 41 41" role="img" aria-label="QR code for the room link" shape-rendering="crispEdges">
+            <rect width="100%" height="100%" fill="#ffffff"></rect>
+            <path fill="#05080a" d=""></path>
+          </svg>
+          <span class="share-qr-label">Scan to join</span>
         </div>
       </div>
 

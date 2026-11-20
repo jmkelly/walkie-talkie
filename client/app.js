@@ -1,4 +1,5 @@
 import { AudioMeters } from "./audio.js";
+import { renderQr } from "./qr.js";
 import { PeerLink } from "./rtc.js";
 
 const ROOM_RE = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
@@ -14,6 +15,8 @@ const els = {
   roomCode: document.getElementById("room-code"),
   shareLink: document.getElementById("share-link"),
   copyLink: document.getElementById("copy-link"),
+  shareQr: document.getElementById("share-qr"),
+  qrCode: document.getElementById("qr-code"),
   status: document.getElementById("status"),
   ptt: document.getElementById("ptt"),
   pttLabel: document.getElementById("ptt-label"),
@@ -181,6 +184,13 @@ function updateRoomUI() {
   els.roomCode.textContent = room;
   els.shareLink.textContent = link;
   els.shareLink.title = link;
+
+  try {
+    renderQr(els.qrCode, link);
+    els.shareQr.hidden = false;
+  } catch {
+    els.shareQr.hidden = true;
+  }
 }
 
 function setState(next, message) {
