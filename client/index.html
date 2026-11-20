@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070a0d">
+  <title>Walkie Talkie</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body data-state="idle">
+  <main class="app">
+    <header class="topbar">
+      <h1 class="brand"><span class="brand-dot" aria-hidden="true"></span>Walkie Talkie</h1>
+      <p class="room" title="Room code">
+        <span class="room-label">Room</span>
+        <span id="room-code">----</span>
+      </p>
+    </header>
+
+    <section class="stage" aria-label="Connection">
+      <div id="status" data-state="idle" role="status" aria-live="polite">Ready when you are.</div>
+
+      <div class="share">
+        <span class="share-label">Send this link to the other person</span>
+        <div class="share-row">
+          <code id="share-link"></code>
+          <button id="copy-link" type="button">Copy link</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="start" type="button">Start talking</button>
+        <button id="retry" type="button" hidden>Try again</button>
+        <button id="new-room" type="button" hidden>New room</button>
+      </div>
+    </section>
+
+    <section class="chat" aria-labelledby="chat-title">
+      <div class="chat-head">
+        <h2 id="chat-title">Messages</h2>
+        <span id="chat-state" class="chat-state" data-state="idle">Not started</span>
+      </div>
+
+      <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions">
+        <p id="chat-empty" class="chat-empty">No messages yet. When they join, say hi.</p>
+      </div>
+
+      <form id="chat-form" class="composer" data-ready="false">
+        <label class="sr-only" for="chat-input">Message</label>
+        <input id="chat-input" name="message" type="text" maxlength="2000" autocomplete="off" enterkeyhint="send" placeholder="Start talking to chat." disabled>
+        <button id="chat-send" type="submit" disabled>Send</button>
+      </form>
+    </section>
+
+    <footer class="dock">
+      <button id="ptt" type="button" disabled aria-pressed="false" aria-describedby="ptt-hint">
+        <svg class="ptt-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+          <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" fill="currentColor"/>
+          <path d="M5.5 11.5a.75.75 0 0 1 1.5 0 5 5 0 0 0 10 0 .75.75 0 0 1 1.5 0 6.5 6.5 0 0 1-5.75 6.46V20h2.25a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1 0-1.5h2.25v-2.04A6.5 6.5 0 0 1 5.5 11.5Z" fill="currentColor"/>
+        </svg>
+        <span id="ptt-label">Talk</span>
+      </button>
+
+      <div class="levels">
+        <div class="level">
+          <span class="level-label" aria-hidden="true">You</span>
+          <div class="meter" id="local-level" aria-hidden="true"><span class="meter-fill"></span></div>
+        </div>
+        <div class="level">
+          <span class="level-label" aria-hidden="true">Them</span>
+          <div class="meter" id="remote-level" aria-hidden="true"><span class="meter-fill"></span></div>
+        </div>
+      </div>
+
+      <div class="dock-meta">
+        <p id="ptt-hint" class="hint">Press Start talking to allow the microphone.</p>
+        <div id="stats" hidden></div>
+      </div>
+    </footer>
+  </main>
+
+  <audio id="remote-audio" autoplay playsinline aria-hidden="true"></audio>
+</body>
+</html>
