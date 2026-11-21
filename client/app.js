@@ -9,6 +9,7 @@ const BACKOFF_MS = [500, 1000, 2000, 5000];
 const MAX_FAILED_CONNECTS = 3;
 const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 const MAX_MESSAGES = 300;
+const READ_ALOUD_KEY = "walkie-talkie:read-aloud";
 
 const els = {
   body: document.body,
@@ -33,11 +34,13 @@ const els = {
   chatInput: document.getElementById("chat-input"),
   chatSend: document.getElementById("chat-send"),
   chatState: document.getElementById("chat-state"),
+  speak: document.getElementById("speak-toggle"),
   typing: document.getElementById("typing"),
   sound: document.getElementById("sound"),
 };
 
 const audio = new AudioMeters();
+const speech = detectSpeech();
 
 let uiState = "idle";
 let room = resolveRoom();
@@ -71,13 +74,26 @@ let peerTypingTimer = 0;
 let localTyping = false;
 let localTypingTimer = 0;
 let lastTypingSentAt = 0;
+let readAloud = false;
+let spokenCount = 0;
 
 const TYPING_IDLE_MS = 2000;
 const PEER_TYPING_TTL_MS = 3000;
 
+function detectSpeech() {
+  try {
+    if (!("speechSynthesis" in window)) return null;
+    if (typeof window.SpeechSynthesisUtterance !== "function") return null;
+    return window.speechSynthesis;
+  } catch {
+    return null;
+  }
+}
+
 function init() {
   updateRoomUI();
   wireEvents();
+  initReadAloud();
   watchViewport();
   watchMessageLog();
   iceConfigPromise = loadIceServers();
@@ -96,6 +112,9 @@ function init() {
         chatEnabled: chatReady(),
         messageCount: messages.length,
         peerTyping,
+        readAloud,
+        readAloudSupported: Boolean(speech),
+        spokenCount,
       };
     },
     async stats() {
@@ -628,6 +647,80 @@ function clearMessages() {
   setPeerTyping(false);
 }
 
+function initReadAloud() {
+  if (!els.speak || !speech) return;
+  els.speak.hidden = false;
+  els.speak.addEventListener("click", () => setReadAloud(!readAloud, true));
+  readAloud = loadReadAloud();
+  syncReadAloud();
+  // Some browsers load the voice list after the page starts.
+  try {
+    speech.getVoices();
+  } catch {}
+}
+
+function loadReadAloud() {
+  try {
+    return localStorage.getItem(READ_ALOUD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveReadAloud() {
+  try {
+    localStorage.setItem(READ_ALOUD_KEY, readAloud ? "1" : "0");
+  } catch {}
+}
+
+function setReadAloud(next, announce = false) {
+  if (!speech) return;
+  readAloud = Boolean(next);
+  if (!readAloud) stopReading();
+  saveReadAloud();
+  syncReadAloud();
+  if (!announce) return;
+  if (readAloud) {
+    flash("New messages will be read aloud.");
+    speakText("Read aloud on.", { cancel: true });
+  } else {
+    flash("Read aloud is off.");
+  }
+}
+
+function syncReadAloud() {
+  if (!els.speak) return;
+  els.speak.setAttribute("aria-pressed", readAloud ? "true" : "false");
+  els.speak.title = readAloud ? "Stop reading messages aloud" : "Read new messages out loud";
+}
+
+function readPeerMessageAloud(text) {
+  if (!readAloud || !speech) return;
+  speakText(text);
+}
+
+function speakText(text, { cancel = true } = {}) {
+  if (!speech) return;
+  const value = typeof text === "string" ? text.trim() : "";
+  if (!value) return;
+  try {
+    // A new message should not wait behind every earlier one. This is a live
+    // channel, so drop the tail and read the latest thing said.
+    if (cancel) speech.cancel();
+    const utterance = new window.SpeechSynthesisUtterance(value);
+    utterance.lang = document.documentElement.lang || navigator.language || "en";
+    speech.speak(utterance);
+    spokenCount += 1;
+  } catch {}
+}
+
+function stopReading() {
+  if (!speech) return;
+  try {
+    speech.cancel();
+  } catch {}
+}
+
 function isControl(target) {
   if (!(target instanceof Element)) return null;
   return target.closest("button, a, input, select, textarea, [contenteditable='true']");
@@ -954,6 +1047,7 @@ function handleServerMessage(raw, markJoined) {
       if (message.from && remotePeerId && message.from !== remotePeerId) break;
       setPeerTyping(false);
       appendMessage({ from: "peer", text: message.text, at: Number(message.at) });
+      readPeerMessageAloud(message.text);
       break;
 
     case "typing":
@@ -1110,6 +1204,7 @@ function enableSound() {
 function teardownPeer() {
   peerGeneration += 1;
   earlySignals = [];
+  stopReading();
   setLocalTyping(false);
   setPeerTyping(false);
   if (peer) {
@@ -1246,6 +1341,7 @@ async function loadIceServers() {
 function shutdown() {
   closeSocketQuietly();
   teardownPeer();
+  stopReading();
   if (micTrack) micTrack.removeEventListener("ended", onTrackEnded);
   if (micStream) {
     for (const track of micStream.getTracks()) {

@@ -158,6 +158,19 @@ A running log, not a feed. Self sits right with a signal-tinted bubble; the othe
 .message--system::before, .message--system::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 ```
 
+### Read-aloud toggle
+
+A setting pill beside the chat status. Off is inset graphite; on takes the signal tint. The label stays `Read aloud` and `aria-pressed` carries the state. It is hidden when the browser has no speech synthesis.
+
+```html
+<button id="speak-toggle" type="button" aria-pressed="false">… Read aloud</button>
+```
+
+```css
+.speak-toggle { min-height: 28px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--inset); color: var(--ink-muted); }
+.speak-toggle[aria-pressed="true"] { border-color: var(--signal-line); background: var(--signal-soft); color: var(--signal); }
+```
+
 ### Composer
 
 One inset field and one quiet send action. The send button is raised graphite, not a second signal-filled primary while Talk is on screen. Focus adds a signal border and a 3 px soft ring. The field itself is 16 px rather than the 15 px body token: iOS Safari zooms the whole page when a focused field is smaller than 16 px, which knocks the console out of alignment.

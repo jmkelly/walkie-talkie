@@ -174,6 +174,20 @@ async function openContext(browser, label, origin) {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   context.setDefaultTimeout(STEP_TIMEOUT_MS);
   await context.grantPermissions(['microphone'], { origin });
+  // Record what the page asks the browser to speak. Headless Chromium has no
+  // system voices, so the utterances are the observable proof.
+  await context.addInitScript(() => {
+    window.__spoken = [];
+    const synth = window.speechSynthesis;
+    if (!synth || typeof synth.speak !== 'function') return;
+    const speak = synth.speak.bind(synth);
+    synth.speak = (utterance) => {
+      window.__spoken.push(String(utterance?.text ?? ''));
+      try {
+        speak(utterance);
+      } catch {}
+    };
+  });
   const page = await context.newPage();
   page.on('pageerror', (error) => console.error(`[${label}] page error: ${firstLine(error)}`));
   page.on('console', (message) => {
@@ -287,6 +301,21 @@ async function waitForMessage(page, text, from, label) {
       .catch(() => []);
     fail(
       `${label}: did not see ${from} message "${text}" within ${STEP_TIMEOUT_MS} ms; saw ${JSON.stringify(seen)}`,
+    );
+  }
+}
+
+async function waitForSpoken(page, text, label) {
+  try {
+    await page.waitForFunction(
+      (want) => Array.isArray(window.__spoken) && window.__spoken.some((line) => line.includes(want)),
+      text,
+      { timeout: STEP_TIMEOUT_MS, polling: 100 },
+    );
+  } catch {
+    const spoken = await page.evaluate(() => window.__spoken ?? null).catch(() => null);
+    fail(
+      `${label}: did not speak "${text}" within ${STEP_TIMEOUT_MS} ms; spoke ${JSON.stringify(spoken)}`,
     );
   }
 }
@@ -520,6 +549,53 @@ async function main() {
     await waitForMessage(b.page, chatReply, 'self', 'B');
     await waitForMessage(a.page, chatReply, 'peer', 'A');
     console.log('A and B exchanged chat messages with a typing indicator');
+
+    const speakToggle = a.page.locator('#speak-toggle');
+    if (!(await speakToggle.isVisible())) {
+      fail('A: the read-aloud setting is not visible');
+    }
+    if ((await speakToggle.getAttribute('aria-pressed')) !== 'false') {
+      fail('A: read aloud should start off');
+    }
+    await speakToggle.click();
+    await a.page.waitForFunction(() => window.__walkie?.state?.().readAloud === true, null, {
+      timeout: STEP_TIMEOUT_MS,
+      polling: 100,
+    });
+    if ((await speakToggle.getAttribute('aria-pressed')) !== 'true') {
+      fail('A: the read-aloud button did not report its pressed state');
+    }
+    const storedReadAloud = await a.page.evaluate(() =>
+      localStorage.getItem('walkie-talkie:read-aloud'),
+    );
+    if (storedReadAloud !== '1') {
+      fail(`A: the read-aloud setting was not remembered (stored ${String(storedReadAloud)})`);
+    }
+
+    const spokenText = 'Can you read this out loud?';
+    await sendChat(b.page, spokenText, 'B');
+    await waitForMessage(a.page, spokenText, 'peer', 'A');
+    await waitForSpoken(a.page, spokenText, 'A');
+
+    await speakToggle.click();
+    if ((await speakToggle.getAttribute('aria-pressed')) !== 'false') {
+      fail('A: the read-aloud button did not turn off');
+    }
+    const spokenBeforeMute = await a.page.evaluate(() => window.__spoken.length);
+    const silentText = 'This message should stay silent.';
+    await sendChat(b.page, silentText, 'B');
+    await waitForMessage(a.page, silentText, 'peer', 'A');
+    await sleep(600);
+    const spokenAfterMute = await a.page.evaluate(() => window.__spoken.length);
+    if (spokenAfterMute !== spokenBeforeMute) {
+      fail(
+        `A: spoke ${spokenAfterMute - spokenBeforeMute} utterance(s) while read aloud was off: ${JSON.stringify(
+          await a.page.evaluate(() => window.__spoken),
+        )}`,
+      );
+    }
+    console.log('A read incoming messages aloud while the setting was on and stayed silent when off');
+
     await checkKeyboardLayout(a.page, 'A');
 
     const baselineStats = await readStats(b.page, 'B');
