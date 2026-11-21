@@ -178,11 +178,18 @@ async function openContext(browser, label, origin) {
   // system voices, so the utterances are the observable proof.
   await context.addInitScript(() => {
     window.__spoken = [];
+    window.__spokenSettings = [];
     const synth = window.speechSynthesis;
     if (!synth || typeof synth.speak !== 'function') return;
     const speak = synth.speak.bind(synth);
     synth.speak = (utterance) => {
-      window.__spoken.push(String(utterance?.text ?? ''));
+      const text = String(utterance?.text ?? '');
+      window.__spoken.push(text);
+      window.__spokenSettings.push({
+        text,
+        pitch: utterance?.pitch,
+        rate: utterance?.rate,
+      });
       try {
         speak(utterance);
       } catch {}
@@ -318,6 +325,18 @@ async function waitForSpoken(page, text, label) {
       `${label}: did not speak "${text}" within ${STEP_TIMEOUT_MS} ms; spoke ${JSON.stringify(spoken)}`,
     );
   }
+}
+
+async function spokenSettingsFor(page, text) {
+  return page.evaluate((want) => {
+    const lines = Array.isArray(window.__spokenSettings) ? window.__spokenSettings : [];
+    const found = lines.filter((line) => String(line.text ?? '').includes(want));
+    return found.length ? found[found.length - 1] : null;
+  }, text);
+}
+
+function pitchMatches(settings, expected) {
+  return Boolean(settings) && Math.abs(Number(settings.pitch) - expected) <= 0.01;
 }
 
 async function sizePage(page, width, height) {
@@ -780,10 +799,66 @@ async function main() {
       fail(`A: the read-aloud setting was not remembered (stored ${String(storedReadAloud)})`);
     }
 
+    const voiceToggle = a.page.locator('#voice-toggle');
+    if (!(await voiceToggle.isVisible())) {
+      fail('A: the read-aloud voice control is not visible');
+    }
+    if (await a.page.locator('#voice-menu').isVisible()) {
+      fail('A: the read-aloud voice menu should start closed');
+    }
+    await voiceToggle.click();
+    try {
+      await a.page.locator('#voice-menu').waitFor({ state: 'visible', timeout: STEP_TIMEOUT_MS });
+    } catch {
+      fail('A: the voice menu did not open');
+    }
+    const voiceValues = await a.page.locator('#voice-options input').evaluateAll((inputs) =>
+      inputs.map((input) => ({ value: input.value, checked: input.checked })),
+    );
+    if (voiceValues.length !== 4) {
+      fail(`A: expected four read-aloud voices, found ${voiceValues.length}`);
+    }
+    const initialVoice = voiceValues.find((voice) => voice.checked);
+    if (initialVoice?.value !== 'channel') {
+      fail(`A: expected channel as the default voice, got ${String(initialVoice?.value)}`);
+    }
+
+    await a.page.locator('#voice-options input[value="deep"]').check();
+    await a.page.waitForFunction(() => window.__walkie?.state?.().readAloudVoice === 'deep', null, {
+      timeout: STEP_TIMEOUT_MS,
+      polling: 100,
+    });
+    const storedVoice = await a.page.evaluate(() =>
+      localStorage.getItem('walkie-talkie:read-aloud-voice'),
+    );
+    if (storedVoice !== 'deep') {
+      fail(`A: the voice choice was not remembered (stored ${String(storedVoice)})`);
+    }
+    await waitForSpoken(a.page, 'This is the deep voice.', 'A voice preview');
+    const preview = await spokenSettingsFor(a.page, 'This is the deep voice.');
+    if (!pitchMatches(preview, 0.7)) {
+      fail(`A: the deep preview did not use the deep pitch (${JSON.stringify(preview)})`);
+    }
+    if (!(await a.page.locator('#voice-menu').isVisible())) {
+      fail('A: choosing a voice should leave the menu open for auditioning');
+    }
+    await a.page.keyboard.press('Escape');
+    if (await a.page.locator('#voice-menu').isVisible()) {
+      fail('A: Escape did not close the voice menu');
+    }
+    if ((await a.page.evaluate(() => document.activeElement?.id)) !== 'voice-toggle') {
+      fail('A: Escape did not return focus to the voice control');
+    }
+    console.log('A opened the voice menu, chose Deep, heard its preview, and closed it with Escape');
+
     const spokenText = 'Can you read this out loud?';
     await sendChat(b.page, spokenText, 'B');
     await waitForMessage(a.page, spokenText, 'peer', 'A');
     await waitForSpoken(a.page, spokenText, 'A');
+    const spokenWithDeep = await spokenSettingsFor(a.page, spokenText);
+    if (!pitchMatches(spokenWithDeep, 0.7)) {
+      fail(`A: the spoken message did not use the chosen voice (${JSON.stringify(spokenWithDeep)})`);
+    }
 
     await speakToggle.click();
     if ((await speakToggle.getAttribute('aria-pressed')) !== 'false') {

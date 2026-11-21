@@ -77,13 +77,37 @@
         <h2 id="chat-title">Messages</h2>
         <div class="chat-head-actions">
           <span id="chat-state" class="chat-state" data-state="idle">Not started</span>
-          <button id="speak-toggle" class="speak-toggle" type="button" aria-pressed="false" aria-label="Read new messages aloud" title="Read new messages out loud" hidden>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-              <path d="M4 10v4h3l4 3V7L7 10H4Z"/>
-              <path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7 7 0 0 1 0 11"/>
-            </svg>
-            <span>Read aloud</span>
-          </button>
+          <div id="voice-group" class="speak-group" hidden>
+            <button id="speak-toggle" class="speak-toggle" type="button" aria-pressed="false" aria-label="Read new messages aloud" title="Read new messages out loud">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M4 10v4h3l4 3V7L7 10H4Z"/>
+                <path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7 7 0 0 1 0 11"/>
+              </svg>
+              <span>Read aloud</span>
+            </button>
+            <button id="voice-toggle" class="voice-toggle" type="button" aria-expanded="false" aria-controls="voice-menu" aria-label="Choose the read-aloud voice" title="Choose the read-aloud voice">
+              <span id="voice-toggle-name" class="voice-toggle-name" aria-hidden="true">Channel</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </button>
+            <div id="voice-menu" class="voice-menu" hidden>
+              <p id="voice-menu-title" class="voice-menu-title">Read-aloud voice</p>
+              <div id="voice-options" class="voice-options" role="radiogroup" aria-labelledby="voice-menu-title"></div>
+              <template id="voice-option-template">
+                <label class="voice-option">
+                  <input type="radio" name="read-aloud-voice">
+                  <span class="voice-option-copy">
+                    <span class="voice-option-name"></span>
+                    <span class="voice-option-hint"></span>
+                  </span>
+                  <svg class="voice-option-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="m5 12.5 4.5 4.5L19 7.5"/>
+                  </svg>
+                </label>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
 

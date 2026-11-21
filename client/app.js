@@ -10,6 +10,16 @@ const MAX_FAILED_CONNECTS = 3;
 const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 const MAX_MESSAGES = 300;
 const READ_ALOUD_KEY = "walkie-talkie:read-aloud";
+const READ_ALOUD_VOICE_KEY = "walkie-talkie:read-aloud-voice";
+
+// Rate and pitch instead of a device voice, so the set is the same in every
+// browser and every choice stays audible when an OS ships a single voice.
+const READ_ALOUD_VOICES = [
+  { id: "channel", name: "Channel", hint: "Plain and even", rate: 1, pitch: 1 },
+  { id: "deep", name: "Deep", hint: "Low and slow", rate: 0.94, pitch: 0.7 },
+  { id: "bright", name: "Bright", hint: "High and quick", rate: 1.06, pitch: 1.3 },
+  { id: "tiny", name: "Tiny", hint: "Small and squeaky", rate: 0.96, pitch: 1.7 },
+];
 
 const els = {
   body: document.body,
@@ -34,7 +44,13 @@ const els = {
   chatInput: document.getElementById("chat-input"),
   chatSend: document.getElementById("chat-send"),
   chatState: document.getElementById("chat-state"),
+  speakGroup: document.getElementById("voice-group"),
   speak: document.getElementById("speak-toggle"),
+  voiceToggle: document.getElementById("voice-toggle"),
+  voiceToggleName: document.getElementById("voice-toggle-name"),
+  voiceMenu: document.getElementById("voice-menu"),
+  voiceOptions: document.getElementById("voice-options"),
+  voiceTemplate: document.getElementById("voice-option-template"),
   typing: document.getElementById("typing"),
   sound: document.getElementById("sound"),
 };
@@ -75,6 +91,7 @@ let localTyping = false;
 let localTypingTimer = 0;
 let lastTypingSentAt = 0;
 let readAloud = false;
+let readAloudVoiceId = READ_ALOUD_VOICES[0].id;
 let spokenCount = 0;
 
 const TYPING_IDLE_MS = 2000;
@@ -114,6 +131,7 @@ function init() {
         peerTyping,
         readAloud,
         readAloudSupported: Boolean(speech),
+        readAloudVoice: readAloudVoiceId,
         spokenCount,
       };
     },
@@ -657,14 +675,124 @@ function clearMessages() {
 
 function initReadAloud() {
   if (!els.speak || !speech) return;
-  els.speak.hidden = false;
+  els.speakGroup.hidden = false;
+  readAloudVoiceId = loadVoiceId();
+  buildVoiceOptions();
   els.speak.addEventListener("click", () => setReadAloud(!readAloud, true));
+  els.voiceToggle.addEventListener("click", () => {
+    if (els.voiceMenu.hidden) openVoiceMenu();
+    else closeVoiceMenu({ restoreFocus: true });
+  });
+  els.voiceOptions.addEventListener("change", onVoiceChoice);
+  document.addEventListener("pointerdown", onVoiceOutsidePointer, { capture: true });
+  document.addEventListener("keydown", onVoiceMenuKeyDown);
+  els.speakGroup.addEventListener("focusout", onVoiceGroupFocusOut);
   readAloud = loadReadAloud();
   syncReadAloud();
+  syncVoice();
   // Some browsers load the voice list after the page starts.
   try {
     speech.getVoices();
   } catch {}
+}
+
+function buildVoiceOptions() {
+  for (const voice of READ_ALOUD_VOICES) {
+    const row = els.voiceTemplate.content.firstElementChild.cloneNode(true);
+    const input = row.querySelector("input");
+    input.value = voice.id;
+    row.querySelector(".voice-option-name").textContent = voice.name;
+    row.querySelector(".voice-option-hint").textContent = voice.hint;
+    els.voiceOptions.appendChild(row);
+  }
+}
+
+function activeVoice() {
+  return READ_ALOUD_VOICES.find((voice) => voice.id === readAloudVoiceId) || READ_ALOUD_VOICES[0];
+}
+
+function loadVoiceId() {
+  let stored = "";
+  try {
+    stored = localStorage.getItem(READ_ALOUD_VOICE_KEY) || "";
+  } catch {}
+  return READ_ALOUD_VOICES.some((voice) => voice.id === stored) ? stored : READ_ALOUD_VOICES[0].id;
+}
+
+function saveVoiceId() {
+  try {
+    localStorage.setItem(READ_ALOUD_VOICE_KEY, readAloudVoiceId);
+  } catch {}
+}
+
+function onVoiceChoice(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || input.type !== "radio") return;
+  const voice = READ_ALOUD_VOICES.find((item) => item.id === input.value);
+  if (!voice) return;
+  readAloudVoiceId = voice.id;
+  saveVoiceId();
+  syncVoice();
+  flash("Read-aloud voice: " + voice.name + ".");
+  speakText("This is the " + voice.name.toLowerCase() + " voice.", { cancel: true });
+}
+
+function syncVoice() {
+  const voice = activeVoice();
+  for (const input of els.voiceOptions.querySelectorAll("input")) {
+    input.checked = input.value === voice.id;
+  }
+  els.voiceToggle.setAttribute("aria-label", "Choose the read-aloud voice, currently " + voice.name);
+  els.voiceToggle.title = "Read-aloud voice: " + voice.name;
+  els.voiceToggleName.textContent = voice.name;
+}
+
+function openVoiceMenu() {
+  els.voiceMenu.hidden = false;
+  els.voiceMenu.style.maxHeight = "";
+  els.voiceMenu.style.overflowY = "";
+  delete els.voiceMenu.dataset.compact;
+  // A short window, especially with the on-screen keyboard open, leaves the
+  // log little room. Drop the hints and show the voices as a two-column bank
+  // before letting the shell clip a choice.
+  const group = els.speakGroup.getBoundingClientRect();
+  const log = els.messages.getBoundingClientRect();
+  const room = Math.round(log.bottom - group.bottom - 16);
+  if (room > 0 && room < els.voiceMenu.scrollHeight) {
+    els.voiceMenu.dataset.compact = "true";
+    if (room < els.voiceMenu.scrollHeight) {
+      els.voiceMenu.style.maxHeight = room + "px";
+      els.voiceMenu.style.overflowY = "auto";
+    }
+  }
+  els.voiceToggle.setAttribute("aria-expanded", "true");
+  const checked = els.voiceOptions.querySelector("input:checked") || els.voiceOptions.querySelector("input");
+  if (checked) checked.focus();
+}
+
+function closeVoiceMenu({ restoreFocus = false } = {}) {
+  if (els.voiceMenu.hidden) return;
+  els.voiceMenu.hidden = true;
+  els.voiceToggle.setAttribute("aria-expanded", "false");
+  if (restoreFocus) els.voiceToggle.focus();
+}
+
+function onVoiceOutsidePointer(event) {
+  if (els.voiceMenu.hidden) return;
+  if (event.target instanceof Node && els.speakGroup.contains(event.target)) return;
+  closeVoiceMenu();
+}
+
+function onVoiceMenuKeyDown(event) {
+  if (event.key !== "Escape" || els.voiceMenu.hidden) return;
+  event.preventDefault();
+  closeVoiceMenu({ restoreFocus: true });
+}
+
+function onVoiceGroupFocusOut(event) {
+  if (els.voiceMenu.hidden) return;
+  if (!event.relatedTarget || els.speakGroup.contains(event.relatedTarget)) return;
+  closeVoiceMenu();
 }
 
 function loadReadAloud() {
@@ -715,8 +843,11 @@ function speakText(text, { cancel = true } = {}) {
     // A new message should not wait behind every earlier one. This is a live
     // channel, so drop the tail and read the latest thing said.
     if (cancel) speech.cancel();
+    const voice = activeVoice();
     const utterance = new window.SpeechSynthesisUtterance(value);
     utterance.lang = document.documentElement.lang || navigator.language || "en";
+    utterance.rate = voice.rate;
+    utterance.pitch = voice.pitch;
     speech.speak(utterance);
     spokenCount += 1;
   } catch {}

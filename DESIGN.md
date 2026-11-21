@@ -162,14 +162,27 @@ A running log, not a feed. Self sits right with a signal-tinted bubble; the othe
 
 A setting pill beside the chat status. Off is inset graphite; on takes the signal tint. The label stays `Read aloud` and `aria-pressed` carries the state. It is hidden when the browser has no speech synthesis.
 
+The pill is a split key. A 25 px caret on its right edge opens the voice menu, so the header gains one key instead of a second field. From 700 px up the key also shows the current voice name. The menu is a local setting, so it drops over the log from the caret.
+
 ```html
 <button id="speak-toggle" type="button" aria-pressed="false">… Read aloud</button>
+<button id="voice-toggle" type="button" aria-expanded="false" aria-controls="voice-menu">…</button>
+<div id="voice-menu" hidden>
+  <p id="voice-menu-title">Read-aloud voice</p>
+  <div id="voice-options" role="radiogroup" aria-labelledby="voice-menu-title">…</div>
+</div>
 ```
 
 ```css
 .speak-toggle { min-height: 28px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--inset); color: var(--ink-muted); }
 .speak-toggle[aria-pressed="true"] { border-color: var(--signal-line); background: var(--signal-soft); color: var(--signal); }
+.speak-group .speak-toggle { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.voice-toggle { width: 25px; border: 1px solid var(--line); border-left: 0; border-radius: 0 var(--r-pill) var(--r-pill) 0; background: var(--inset); color: var(--ink-soft); }
+.voice-toggle[aria-expanded="true"] { border-color: var(--signal-line); background: var(--signal-soft); color: var(--signal); }
+.voice-option:has(input:checked) { border-color: var(--signal-line); background: var(--signal-soft); }
 ```
+
+The menu holds one radio row per voice. The row shows the voice name and a short hint, and the chosen row takes the signal tint and check. Four choices ship: Channel (plain and even), Deep (low and slow), Bright (high and quick), Tiny (small and squeaky). Selecting previews the voice out loud and stores it in `localStorage`. The menu stays open while choosing so arrow keys audition the set. Escape and a click outside close it, and Escape returns focus to the caret. Rate and pitch rather than a named device voice keep the same four choices on every OS.
 
 ### Composer
 

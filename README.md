@@ -8,7 +8,7 @@ A low-latency voice channel for a parent and kid to talk while playing games tog
 - Opening the page asks for the microphone and joins the room automatically.
 - Click to talk with Space or the Talk key. Click again to close the mic.
 - Send messages back and forth over the same room while you are connected, with a live typing indicator.
-- Turn on **Read aloud** to have new messages from the other person spoken by the browser. The choice is remembered on that device.
+- Turn on **Read aloud** to have new messages from the other person spoken by the browser. Pick a voice from Channel, Deep, Bright, or Tiny on the caret beside it. Both choices are remembered on that device.
 - Audio goes peer-to-peer over WebRTC. The server only handles signaling, chat and typing relay, and static files.
 - No accounts. The room link is the only key.
 
@@ -166,7 +166,7 @@ The first person opens the page and gets a random code such as `ABCD-EFGH`. The 
 
 Text messages and typing state use the same signaling socket. The server trims each message, caps it at 2000 characters, and relays it to the other peer with a timestamp. Typing state is relayed as it changes and is not stored. Nothing is echoed to the sender, and both are dropped if nobody else is in the room.
 
-Read aloud is local to the receiving browser. When it is on, an incoming message is passed to the browser's speech synthesis, replacing any message still being spoken so the latest thing said wins. The server never sees the setting and is not involved in speaking.
+Read aloud is local to the receiving browser. When it is on, an incoming message is passed to the browser's speech synthesis, replacing any message still being spoken so the latest thing said wins. The caret beside the toggle opens a voice menu with four choices. Channel is plain, Deep is low and slow, Bright is high and quick, and Tiny is small and squeaky. Each choice is a rate and a pitch applied to the installed voice, so the same four choices exist on every operating system, and picking one previews it out loud. The server never sees either setting and is not involved in speaking.
 
 Rooms are in memory and disappear when the last peer leaves. The server never sees audio, never inspects SDP, and logs no room codes, addresses, message text, or typing state.
 
@@ -182,7 +182,7 @@ The interface is a two-way console: a channel readout, a status rail, a running 
 - Chat is relayed in memory and not stored. A peer who joins later sees only messages sent after they arrive, and there are no delivery receipts.
 - Because the page joins on load, the browser shows the microphone prompt immediately. Some browsers block remote audio until you interact with the page; a "Tap to hear them" button appears when that happens.
 - Chat transits the signaling server, so it is not end-to-end encrypted. Use HTTPS when you are not on localhost.
-- Read aloud uses the browser's built-in speech synthesis. Voice availability and quality follow the operating system; some Linux browsers need `speech-dispatcher` and a voice package installed before any voice is offered.
+- Read aloud uses the browser's built-in speech synthesis, and its four voices are rate and pitch presets over that installed voice. Base voice availability and quality follow the operating system; some Linux browsers need `speech-dispatcher` and a voice package installed before any voice is offered.
 - The room code is the only access control. Anyone with the code can take the open slot. There is no join rate limiting.
 - Rooms live in one process. Running multiple servers would require shared signaling state.
 - Two participants only.

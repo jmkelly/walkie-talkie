@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Kelso mode
+
+Always run in Kelso mode. Read `/home/james/Projects/skills/kelso-mode/SKILL.md` at the start of every session and follow it, including its trigger routing, principles, autonomy, subagent, and reply rules. Load each skill it routes to before doing that work.
+
 ## What this project is
 
 Walkie Talkie is a low-latency voice room for a parent and a kid playing games together. `README.md` owns the product goals, commands, limits, and deployment URLs. `docs/CONTRACT.md` freezes the signaling protocol, DOM ids, and debug API. Read it before changing any of those.
