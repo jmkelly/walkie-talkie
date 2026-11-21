@@ -1535,44 +1535,50 @@ button:disabled {
 
 /* On-screen keyboard. iOS Safari leaves the layout viewport at full height
    when the keyboard opens, so app.js pins the shell to the visual viewport
-   and marks the document. Give the message log the room: the status rail and
-   the dock chrome step aside, but the Talk key and the composer stay put. */
+   and marks the document. This applies at every width: an iPad in landscape
+   still covers the composer even though the shell uses the wide layout. Give
+   the message log the room. The status rail and the dock chrome step aside,
+   but the Talk key and the composer stay put. */
 
-@media (max-width: 939px) {
-  html[data-keyboard="open"] {
-    overflow: hidden;
-  }
+html[data-keyboard="open"] {
+  overflow: hidden;
+}
 
-  html[data-keyboard="open"] body {
-    min-height: 0;
-    overflow: hidden;
-  }
+html[data-keyboard="open"] body {
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
-  html[data-keyboard="open"] .app {
-    height: var(--app-height, 100dvh);
-    min-height: 0;
-  }
+html[data-keyboard="open"] .app {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
 
-  html[data-keyboard="open"] .stage,
-  html[data-keyboard="open"] .dock-head,
-  html[data-keyboard="open"] .levels,
-  html[data-keyboard="open"] .dock-meta {
-    display: none;
-  }
+html[data-keyboard="open"] .stage,
+html[data-keyboard="open"] .dock-head,
+html[data-keyboard="open"] .levels,
+html[data-keyboard="open"] .dock-meta {
+  display: none;
+}
 
-  html[data-keyboard="open"] .dock {
-    gap: 0;
-    padding: 8px 12px 10px;
-  }
+html[data-keyboard="open"] .dock {
+  gap: 0;
+  padding: 8px 12px 10px;
+}
 
-  html[data-keyboard="open"] #ptt {
-    min-height: 46px;
-  }
+html[data-keyboard="open"] #ptt {
+  min-height: 46px;
+}
 
-  html[data-keyboard="open"] .messages {
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
+html[data-keyboard="open"] .messages {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {

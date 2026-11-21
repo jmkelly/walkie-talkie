@@ -189,6 +189,8 @@ function watchViewport() {
   if (!viewport) return;
 
   let frame = 0;
+  let appliedHeight = 0;
+  let keyboardOpen = false;
 
   const apply = () => {
     frame = 0;
@@ -196,19 +198,25 @@ function watchViewport() {
     if (!height) return;
 
     const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
-    const zoomed = viewport.scale > 1.01;
-    const keyboardOpen = !zoomed && height < layoutHeight - 120;
+    const nextKeyboard = viewport.scale <= 1.01 && height < layoutHeight - 120;
+    const root = document.documentElement;
 
-    document.documentElement.style.setProperty("--app-height", height + "px");
+    // Safari fires visualViewport events on every keystroke while it keeps
+    // the focused composer in view. Rewriting the same values invalidates
+    // the whole shell each time, so only write when a value changes.
+    if (height !== appliedHeight) {
+      appliedHeight = height;
+      root.style.setProperty("--app-height", height + "px");
+    }
 
-    if (keyboardOpen) {
-      document.documentElement.dataset.keyboard = "open";
-    } else {
-      delete document.documentElement.dataset.keyboard;
+    if (nextKeyboard !== keyboardOpen) {
+      keyboardOpen = nextKeyboard;
+      if (keyboardOpen) root.dataset.keyboard = "open";
+      else delete root.dataset.keyboard;
     }
 
     // iOS pans the page to keep the focused field above the keyboard. The
-    // shell is already sized to the visible area, so put the page back at 0.
+    // shell already fills the visible area, so put the page back at 0.
     if (keyboardOpen && window.scrollY) window.scrollTo(0, 0);
   };
 

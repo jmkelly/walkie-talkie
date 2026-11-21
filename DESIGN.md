@@ -88,7 +88,7 @@ Uppercase micro-label, monospace code, and a lamp. The lamp is the only colored 
 - One frame. Below 940 px wide and 840 px tall, compact the header, rail, and dock instead of removing content.
 - The pairing QR and the message log stay in the DOM and visible while waiting. The share panel hides only when a peer is connected.
 - A very short window may scroll the page, but content is never hidden to make a breakpoint fit.
-- The one exception is the on-screen keyboard. iOS keeps the layout viewport at full height when the keyboard opens, so the client pins the shell to the visual viewport, drops the status rail and dock chrome, and keeps the Talk key and composer. Chat is the task while typing; this is keyboard mode, not a breakpoint.
+- The one exception is the on-screen keyboard. iOS keeps the layout viewport at full height when the keyboard opens, so the client pins the shell to the visual viewport, drops the status rail and dock chrome, and keeps the Talk key and composer. This applies at every width, including an iPad in landscape where the shell uses the wide layout. Chat is the task while typing; this is keyboard mode, not a breakpoint.
 
 ### Status line
 

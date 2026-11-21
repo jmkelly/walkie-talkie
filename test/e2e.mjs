@@ -320,89 +320,276 @@ async function waitForSpoken(page, text, label) {
   }
 }
 
-async function checkKeyboardLayout(page, label) {
-  await page.setViewportSize({ width: 390, height: 844 });
+async function sizePage(page, width, height) {
+  await page.evaluate(({ width, height }) => {
+    const viewport = window.__fakeViewport;
+    if (!viewport) return;
+    viewport.width = width;
+    viewport.height = height;
+    viewport.scale = 1;
+    viewport.offsetTop = 0;
+    viewport.offsetLeft = 0;
+    viewport.pageTop = 0;
+    viewport.pageLeft = 0;
+    viewport.dispatchEvent(new Event("resize"));
+  }, { width, height });
+  await page.setViewportSize({ width, height });
+  await page.waitForTimeout(150);
+}
+
+async function moveKeyboard(page, from, to) {
+  const steps = 12;
+  for (let step = 0; step <= steps; step += 1) {
+    const height = Math.round(from + ((to - from) * step) / steps);
+    await page.evaluate((height) => {
+      window.__fakeViewport.height = height;
+      window.__fakeViewport.dispatchEvent(new Event("resize"));
+    }, height);
+    await page.waitForTimeout(16);
+  }
   await page.waitForTimeout(200);
+}
 
-  const font = await page.evaluate(
-    () => getComputedStyle(document.querySelector('#chat-input')).fontSize,
-  );
-  if (parseFloat(font) < 16) {
-    fail(`${label}: #chat-input is ${font}; iOS zooms the page for fields under 16px`);
+async function startKeyboardProbe(page) {
+  await page.evaluate(() => {
+    window.__keyboardFrames = [];
+    const sample = () => {
+      window.__keyboardFrames.push({
+        stage: getComputedStyle(document.querySelector(".stage")).display,
+        appHeight: Math.round(document.querySelector(".app").getBoundingClientRect().height),
+      });
+      window.__keyboardRaf = requestAnimationFrame(sample);
+    };
+    sample();
+  });
+}
+
+async function stopKeyboardProbe(page) {
+  return page.evaluate(() => {
+    cancelAnimationFrame(window.__keyboardRaf);
+    return window.__keyboardFrames;
+  });
+}
+
+function checkKeyboardAnimation(frames, opening, label, scenario) {
+  if (frames.length === 0) {
+    fail(`${label}: ${scenario.name} keyboard probe sampled no frames`);
   }
-
-  for (let i = 1; i <= 8; i += 1) {
-    await sendChat(page, `Keyboard check message ${i}.`, label);
+  const stages = [];
+  for (const frame of frames) {
+    if (stages[stages.length - 1] !== frame.stage) stages.push(frame.stage);
   }
-  await page.waitForTimeout(250);
+  if (opening) {
+    if (stages[0] === "none") {
+      fail(`${label}: ${scenario.name} status rail was already hidden before the keyboard opened`);
+    }
+    if (stages[stages.length - 1] !== "none") {
+      fail(`${label}: ${scenario.name} status rail stayed visible with the keyboard open`);
+    }
+  } else {
+    if (stages[0] !== "none") {
+      fail(`${label}: ${scenario.name} status rail was visible while the keyboard was open`);
+    }
+    if (stages[stages.length - 1] === "none") {
+      fail(`${label}: ${scenario.name} status rail stayed hidden after the keyboard closed`);
+    }
+  }
+  if (stages.length > 2) {
+    fail(
+      `${label}: ${scenario.name} status rail flickered during the keyboard transition (${stages.join(" -> ")})`,
+    );
+  }
+  for (let i = 1; i < frames.length; i += 1) {
+    const delta = frames[i].appHeight - frames[i - 1].appHeight;
+    if (opening && delta > 2) {
+      fail(
+        `${label}: ${scenario.name} shell grew from ${frames[i - 1].appHeight}px to ${frames[i].appHeight}px while the keyboard opened`,
+      );
+    }
+    if (!opening && delta < -2) {
+      fail(
+        `${label}: ${scenario.name} shell shrank from ${frames[i - 1].appHeight}px to ${frames[i].appHeight}px while the keyboard closed`,
+      );
+    }
+  }
+}
 
-  // iOS keeps the layout viewport at full height when the keyboard opens and
-  // only shrinks the visual viewport. Chromium cannot shrink one without the
-  // other, so the page runs with the fake visual viewport installed above and
-  // we shrink only that, exactly like the phone does.
-  const keyboardHeight = 508;
-  const fakeViewport = await page.evaluate(() => window.visualViewport === window.__fakeViewport);
-  if (!fakeViewport) fail(`${label}: the fake visual viewport was not installed`);
-  await page.evaluate((height) => {
-    window.__fakeViewport.height = height;
-    window.__fakeViewport.dispatchEvent(new Event('resize'));
-  }, keyboardHeight);
-  await page.waitForTimeout(300);
-
-  const layout = await page.evaluate((height) => {
+async function measureLayout(page) {
+  return page.evaluate(() => {
     const box = (selector) => {
       const element = document.querySelector(selector);
-      return element ? element.getBoundingClientRect() : null;
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        display: getComputedStyle(element).display,
+      };
     };
-    const messages = box('#messages');
-    const latest = box('.message:last-of-type');
+    const messages = document.querySelector("#messages");
+    const latest = messages?.querySelector(".message:last-of-type");
+    const log = messages?.getBoundingClientRect();
+    const latestRect = latest?.getBoundingClientRect();
     return {
-      appHeight: Math.round(box('.app').height),
-      composerBottom: Math.round(box('.composer').bottom),
-      messagesHeight: Math.round(messages.height),
-      stageHidden: getComputedStyle(document.querySelector('.stage')).display === 'none',
+      keyboard: document.documentElement.dataset.keyboard ?? "",
+      app: box(".app"),
+      stage: box(".stage"),
+      composer: box(".composer"),
+      messages: box("#messages"),
+      typing: box("#typing"),
+      ptt: box("#ptt"),
+      viewportHeight: Math.round(window.visualViewport?.height ?? window.innerHeight),
+      innerHeight: window.innerHeight,
+      innerWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
       latestInLog:
-        Boolean(latest) &&
-        latest.top >= messages.top - 1 &&
-        latest.bottom <= messages.bottom + 1,
-      inputFont: parseFloat(getComputedStyle(document.querySelector('#chat-input')).fontSize),
-      keyboardHeight: height,
+        !log ||
+        !latestRect ||
+        (latestRect.top >= log.top - 1 && latestRect.bottom <= log.bottom + 1),
     };
-  }, keyboardHeight);
-
-  if (layout.appHeight !== layout.keyboardHeight) {
-    fail(`${label}: keyboard shell is ${layout.appHeight}px, expected ${layout.keyboardHeight}px`);
-  }
-  if (!layout.stageHidden) fail(`${label}: the status rail still takes room above the keyboard`);
-  if (layout.messagesHeight < 200) {
-    fail(`${label}: the message log shrank to ${layout.messagesHeight}px with the keyboard open`);
-  }
-  if (layout.composerBottom > layout.keyboardHeight) {
-    fail(`${label}: the composer is under the keyboard (${layout.composerBottom}px)`);
-  }
-  if (!layout.latestInLog) {
-    fail(`${label}: the newest message is not inside the visible message log`);
-  }
-  if (layout.inputFont < 16) fail(`${label}: the composer font is below 16px`);
-
-  await page.evaluate(() => {
-    window.__fakeViewport.height = 844;
-    window.__fakeViewport.dispatchEvent(new Event('resize'));
-    window.scrollTo(0, 0);
   });
-  await page.waitForTimeout(250);
+}
 
-  const restored = await page.evaluate(() => ({
-    appHeight: Math.round(document.querySelector('.app').getBoundingClientRect().height),
-    stageHidden: getComputedStyle(document.querySelector('.stage')).display === 'none',
-  }));
-  if (restored.appHeight !== 844 || restored.stageHidden) {
-    fail(`${label}: the full layout did not come back after the keyboard closed`);
+function assertFrameStable(
+  before,
+  after,
+  label,
+  context,
+  names = ["app", "composer", "messages", "ptt"],
+) {
+  for (const name of names) {
+    for (const edge of ["top", "bottom", "height"]) {
+      if (Math.abs(after[name][edge] - before[name][edge]) > 1) {
+        fail(
+          `${label}: ${context} moved ${name}.${edge} from ${before[name][edge]} to ${after[name][edge]}`,
+        );
+      }
+    }
+  }
+}
+
+async function checkKeyboardLayout(page, label) {
+  const scenarios = [
+    { name: "iPhone portrait", width: 390, height: 844, keyboard: 508, messages: 200 },
+    { name: "iPad portrait", width: 768, height: 1024, keyboard: 560, messages: 160 },
+    { name: "iPad landscape", width: 1024, height: 768, keyboard: 430, messages: 160 },
+  ];
+
+  for (const scenario of scenarios) {
+    await sizePage(page, scenario.width, scenario.height);
+
+    const font = await page.evaluate(
+      () => getComputedStyle(document.querySelector("#chat-input")).fontSize,
+    );
+    if (parseFloat(font) < 16) {
+      fail(`${label}: #chat-input is ${font}; iOS zooms the page for fields under 16px`);
+    }
+
+    for (let i = 1; i <= 8; i += 1) {
+      await sendChat(page, `${scenario.name} keyboard check ${i}.`, label);
+    }
+    await page.waitForTimeout(250);
+
+    // iOS keeps the layout viewport at full height when the keyboard opens and
+    // only shrinks the visual viewport. Chromium cannot shrink one without the
+    // other, so the page runs with a fake visual viewport and we animate only
+    // that, the way the keyboard does. iPad in landscape uses the wide layout,
+    // where the keyboard used to cover the composer and Safari panned the
+    // page on every keystroke.
+    const fakeViewport = await page.evaluate(() => window.visualViewport === window.__fakeViewport);
+    if (!fakeViewport) fail(`${label}: the fake visual viewport was not installed`);
+
+    await page.locator("#chat-input").focus();
+    await startKeyboardProbe(page);
+    await moveKeyboard(page, scenario.height, scenario.keyboard);
+    checkKeyboardAnimation(await stopKeyboardProbe(page), true, label, scenario);
+    const open = await measureLayout(page);
+
+    if (open.keyboard !== "open") {
+      fail(`${label}: ${scenario.name} keyboard did not open (state "${open.keyboard}")`);
+    }
+    if (Math.abs(open.app.height - scenario.keyboard) > 1) {
+      fail(
+        `${label}: ${scenario.name} shell is ${open.app.height}px, expected ${scenario.keyboard}px`,
+      );
+    }
+    if (open.app.top < -1 || open.app.bottom > scenario.keyboard + 1) {
+      fail(
+        `${label}: ${scenario.name} shell spans ${open.app.top}..${open.app.bottom}, outside the ${scenario.keyboard}px visible area`,
+      );
+    }
+    if (open.stage.display !== "none") {
+      fail(`${label}: ${scenario.name} status rail still takes room above the keyboard`);
+    }
+    if (open.messages.height < scenario.messages) {
+      fail(
+        `${label}: ${scenario.name} message log shrank to ${open.messages.height}px, expected at least ${scenario.messages}px`,
+      );
+    }
+    if (open.composer.bottom > scenario.keyboard + 1) {
+      fail(`${label}: ${scenario.name} composer is under the keyboard (${open.composer.bottom}px)`);
+    }
+    if (open.ptt.bottom > scenario.keyboard + 1 || open.ptt.height < 40) {
+      fail(`${label}: ${scenario.name} Talk key is not usable above the keyboard`);
+    }
+    if (open.scrollWidth > open.innerWidth + 1) {
+      fail(`${label}: ${scenario.name} page overflows horizontally`);
+    }
+    if (!open.latestInLog) {
+      fail(`${label}: ${scenario.name} newest message is not inside the visible message log`);
+    }
+
+    const beforeTyping = await measureLayout(page);
+    for (const character of "stays still") {
+      await page.keyboard.type(character);
+      // Safari pans the visual viewport to keep the caret in view. The shell
+      // must not chase that pan by resizing or moving.
+      await page.evaluate(() => window.__fakeViewport.dispatchEvent(new Event("scroll")));
+      await page.waitForTimeout(30);
+    }
+    await page.waitForTimeout(120);
+    const whileTyping = await measureLayout(page);
+    if (whileTyping.keyboard !== "open") {
+      fail(`${label}: ${scenario.name} keyboard mode flickered while typing`);
+    }
+    assertFrameStable(beforeTyping, whileTyping, label, `${scenario.name} typing`);
+    if (whileTyping.scrollWidth > whileTyping.innerWidth + 1) {
+      fail(`${label}: ${scenario.name} page overflowed while typing`);
+    }
+    await page.locator("#chat-input").fill("");
+
+    await startKeyboardProbe(page);
+    await moveKeyboard(page, scenario.keyboard, scenario.height);
+    checkKeyboardAnimation(await stopKeyboardProbe(page), false, label, scenario);
+    const closed = await measureLayout(page);
+
+    if (closed.keyboard !== "") {
+      fail(`${label}: ${scenario.name} keyboard mode did not close`);
+    }
+    if (closed.stage.display === "none") {
+      fail(`${label}: ${scenario.name} status rail stayed hidden after the keyboard closed`);
+    }
+    if (closed.app.height <= scenario.keyboard + 100) {
+      fail(`${label}: ${scenario.name} full layout did not come back`);
+    }
+    if (closed.app.top < -1 || closed.app.bottom > scenario.height + 1) {
+      fail(`${label}: ${scenario.name} shell does not fit after the keyboard closed`);
+    }
+    if (closed.scrollWidth > closed.innerWidth + 1) {
+      fail(`${label}: ${scenario.name} page overflows horizontally after the keyboard closed`);
+    }
+    if (!closed.latestInLog) {
+      fail(`${label}: ${scenario.name} newest message is not inside the log after the keyboard closed`);
+    }
+
+    console.log(`${label}: ${scenario.name} keyboard keeps the composer and log still`);
   }
 
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await page.waitForTimeout(200);
-  console.log(`${label}: keyboard mode keeps the newest messages above the composer`);
+  await sizePage(page, 1280, 720);
 }
 
 async function readState(page, label) {
@@ -539,12 +726,33 @@ async function main() {
 
     const chatHello = 'Hi! Can you hear me?';
     const chatReply = 'Loud and clear.';
+    const aBeforeTyping = await measureLayout(a.page);
     await a.page.locator('#chat-input').fill(chatHello);
+    const aWhileTyping = await measureLayout(a.page);
+    assertFrameStable(aBeforeTyping, aWhileTyping, 'A', 'typing in the composer');
+
+    const bBeforeTyping = await measureLayout(b.page);
     await waitForTyping(b.page, true, 'B while A types');
+    const bWhileTyping = await measureLayout(b.page);
+    assertFrameStable(bBeforeTyping, bWhileTyping, 'B', 'the typing indicator', [
+      'app',
+      'composer',
+      'ptt',
+    ]);
+    if (bWhileTyping.typing.bottom > bWhileTyping.composer.top + 1) {
+      fail('B: the typing indicator overlaps the composer');
+    }
+
     await a.page.locator('#chat-input').press('Enter');
     await waitForMessage(a.page, chatHello, 'self', 'A');
     await waitForMessage(b.page, chatHello, 'peer', 'B');
     await waitForTyping(b.page, false, 'B after A sent');
+    const bAfterTyping = await measureLayout(b.page);
+    assertFrameStable(bBeforeTyping, bAfterTyping, 'B', 'clearing the typing indicator', [
+      'app',
+      'composer',
+      'ptt',
+    ]);
     await sendChat(b.page, chatReply, 'B');
     await waitForMessage(b.page, chatReply, 'self', 'B');
     await waitForMessage(a.page, chatReply, 'peer', 'A');
