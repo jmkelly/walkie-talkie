@@ -88,6 +88,7 @@ Uppercase micro-label, monospace code, and a lamp. The lamp is the only colored 
 - One frame. Below 940 px wide and 840 px tall, compact the header, rail, and dock instead of removing content.
 - The pairing QR and the message log stay in the DOM and visible while waiting. The share panel hides only when a peer is connected.
 - A very short window may scroll the page, but content is never hidden to make a breakpoint fit.
+- The one exception is the on-screen keyboard. iOS keeps the layout viewport at full height when the keyboard opens, so the client pins the shell to the visual viewport, drops the status rail and dock chrome, and keeps the Talk key and composer. Chat is the task while typing; this is keyboard mode, not a breakpoint.
 
 ### Status line
 
@@ -159,7 +160,7 @@ A running log, not a feed. Self sits right with a signal-tinted bubble; the othe
 
 ### Composer
 
-One inset field and one quiet send action. The send button is raised graphite, not a second signal-filled primary while Talk is on screen. Focus adds a signal border and a 3 px soft ring.
+One inset field and one quiet send action. The send button is raised graphite, not a second signal-filled primary while Talk is on screen. Focus adds a signal border and a 3 px soft ring. The field itself is 16 px rather than the 15 px body token: iOS Safari zooms the whole page when a focused field is smaller than 16 px, which knocks the console out of alignment.
 
 ```css
 .composer { border-top: 1px solid var(--line); background: var(--console); }

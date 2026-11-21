@@ -852,7 +852,8 @@ body[data-state="reconnecting"] .share {
   background: var(--inset);
   color: var(--ink);
   font: inherit;
-  font-size: var(--text-body);
+  /* iOS zooms the page when a focused field is smaller than 16px. */
+  font-size: 16px;
   transition: border-color 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
 }
 
@@ -1120,6 +1121,8 @@ body[data-state="live"] .levels {
   height: 1px;
   opacity: 0;
   pointer-events: none;
+  /* Even an off-screen field must be 16px so iOS does not zoom. */
+  font-size: 16px;
 }
 
 button {
@@ -1431,7 +1434,7 @@ button:disabled {
   #chat-input {
     height: 44px;
     padding: 0 12px;
-    font-size: 0.875rem;
+    font-size: 16px;
   }
 
   #chat-send {
@@ -1476,6 +1479,48 @@ button:disabled {
 
   .hint {
     font-size: 0.6875rem;
+  }
+}
+
+/* On-screen keyboard. iOS Safari leaves the layout viewport at full height
+   when the keyboard opens, so app.js pins the shell to the visual viewport
+   and marks the document. Give the message log the room: the status rail and
+   the dock chrome step aside, but the Talk key and the composer stay put. */
+
+@media (max-width: 939px) {
+  html[data-keyboard="open"] {
+    overflow: hidden;
+  }
+
+  html[data-keyboard="open"] body {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  html[data-keyboard="open"] .app {
+    height: var(--app-height, 100dvh);
+    min-height: 0;
+  }
+
+  html[data-keyboard="open"] .stage,
+  html[data-keyboard="open"] .dock-head,
+  html[data-keyboard="open"] .levels,
+  html[data-keyboard="open"] .dock-meta {
+    display: none;
+  }
+
+  html[data-keyboard="open"] .dock {
+    gap: 0;
+    padding: 8px 12px 10px;
+  }
+
+  html[data-keyboard="open"] #ptt {
+    min-height: 46px;
+  }
+
+  html[data-keyboard="open"] .messages {
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 }
 

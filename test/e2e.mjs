@@ -291,6 +291,91 @@ async function waitForMessage(page, text, from, label) {
   }
 }
 
+async function checkKeyboardLayout(page, label) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(200);
+
+  const font = await page.evaluate(
+    () => getComputedStyle(document.querySelector('#chat-input')).fontSize,
+  );
+  if (parseFloat(font) < 16) {
+    fail(`${label}: #chat-input is ${font}; iOS zooms the page for fields under 16px`);
+  }
+
+  for (let i = 1; i <= 8; i += 1) {
+    await sendChat(page, `Keyboard check message ${i}.`, label);
+  }
+  await page.waitForTimeout(250);
+
+  // iOS keeps the layout viewport at full height when the keyboard opens and
+  // only shrinks the visual viewport. Chromium cannot shrink one without the
+  // other, so the page runs with the fake visual viewport installed above and
+  // we shrink only that, exactly like the phone does.
+  const keyboardHeight = 508;
+  const fakeViewport = await page.evaluate(() => window.visualViewport === window.__fakeViewport);
+  if (!fakeViewport) fail(`${label}: the fake visual viewport was not installed`);
+  await page.evaluate((height) => {
+    window.__fakeViewport.height = height;
+    window.__fakeViewport.dispatchEvent(new Event('resize'));
+  }, keyboardHeight);
+  await page.waitForTimeout(300);
+
+  const layout = await page.evaluate((height) => {
+    const box = (selector) => {
+      const element = document.querySelector(selector);
+      return element ? element.getBoundingClientRect() : null;
+    };
+    const messages = box('#messages');
+    const latest = box('.message:last-of-type');
+    return {
+      appHeight: Math.round(box('.app').height),
+      composerBottom: Math.round(box('.composer').bottom),
+      messagesHeight: Math.round(messages.height),
+      stageHidden: getComputedStyle(document.querySelector('.stage')).display === 'none',
+      latestInLog:
+        Boolean(latest) &&
+        latest.top >= messages.top - 1 &&
+        latest.bottom <= messages.bottom + 1,
+      inputFont: parseFloat(getComputedStyle(document.querySelector('#chat-input')).fontSize),
+      keyboardHeight: height,
+    };
+  }, keyboardHeight);
+
+  if (layout.appHeight !== layout.keyboardHeight) {
+    fail(`${label}: keyboard shell is ${layout.appHeight}px, expected ${layout.keyboardHeight}px`);
+  }
+  if (!layout.stageHidden) fail(`${label}: the status rail still takes room above the keyboard`);
+  if (layout.messagesHeight < 200) {
+    fail(`${label}: the message log shrank to ${layout.messagesHeight}px with the keyboard open`);
+  }
+  if (layout.composerBottom > layout.keyboardHeight) {
+    fail(`${label}: the composer is under the keyboard (${layout.composerBottom}px)`);
+  }
+  if (!layout.latestInLog) {
+    fail(`${label}: the newest message is not inside the visible message log`);
+  }
+  if (layout.inputFont < 16) fail(`${label}: the composer font is below 16px`);
+
+  await page.evaluate(() => {
+    window.__fakeViewport.height = 844;
+    window.__fakeViewport.dispatchEvent(new Event('resize'));
+    window.scrollTo(0, 0);
+  });
+  await page.waitForTimeout(250);
+
+  const restored = await page.evaluate(() => ({
+    appHeight: Math.round(document.querySelector('.app').getBoundingClientRect().height),
+    stageHidden: getComputedStyle(document.querySelector('.stage')).display === 'none',
+  }));
+  if (restored.appHeight !== 844 || restored.stageHidden) {
+    fail(`${label}: the full layout did not come back after the keyboard closed`);
+  }
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForTimeout(200);
+  console.log(`${label}: keyboard mode keeps the newest messages above the composer`);
+}
+
 async function readState(page, label) {
   let state;
   try {
@@ -362,6 +447,22 @@ async function main() {
     browser = await launchBrowser();
 
     const a = await openContext(browser, 'A', origin);
+    // A real iPhone shrinks only the visual viewport when the keyboard opens.
+    // Keep a controllable stand-in so the keyboard layout can be checked.
+    await a.page.addInitScript(() => {
+      const fake = new EventTarget();
+      Object.assign(fake, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scale: 1,
+        offsetTop: 0,
+        offsetLeft: 0,
+        pageTop: 0,
+        pageLeft: 0,
+      });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => fake });
+      window.__fakeViewport = fake;
+    });
     await a.page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: LIVE_TIMEOUT_MS });
     await waitForBodyState(a.page, 'waiting', LIVE_TIMEOUT_MS, 'A after load');
     const roomCode = await readRoomCode(a.page, 'A');
@@ -419,6 +520,7 @@ async function main() {
     await waitForMessage(b.page, chatReply, 'self', 'B');
     await waitForMessage(a.page, chatReply, 'peer', 'A');
     console.log('A and B exchanged chat messages with a typing indicator');
+    await checkKeyboardLayout(a.page, 'A');
 
     const baselineStats = await readStats(b.page, 'B');
     const baselineBytes = Number.isFinite(baselineStats.bytesReceived) ? baselineStats.bytesReceived : 0;

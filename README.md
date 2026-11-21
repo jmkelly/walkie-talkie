@@ -122,7 +122,7 @@ npx playwright install chromium   # once
 npm run test:e2e
 ```
 
-The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the QR code renders, proves a 390x700 viewport keeps the QR code and message log visible, proves the typing indicator appears and clears, exchanges chat messages both ways, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
+The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the QR code renders, proves a 390x700 viewport keeps the QR code and message log visible, proves the typing indicator appears and clears, exchanges chat messages both ways, shrinks the visual viewport to simulate an iPhone keyboard and proves the newest messages and composer stay visible, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
 
 ```sh
 npm run screenshots

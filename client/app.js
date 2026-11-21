@@ -65,6 +65,7 @@ let statsTimer = 0;
 let meterRaf = 0;
 let iceConfigPromise = null;
 let messages = [];
+let messagesPinned = true;
 let peerTyping = false;
 let peerTypingTimer = 0;
 let localTyping = false;
@@ -77,6 +78,8 @@ const PEER_TYPING_TTL_MS = 3000;
 function init() {
   updateRoomUI();
   wireEvents();
+  watchViewport();
+  watchMessageLog();
   iceConfigPromise = loadIceServers();
   syncUI();
 
@@ -145,6 +148,9 @@ function wireEvents() {
   els.chatInput.addEventListener("input", onChatInput);
   els.chatInput.addEventListener("blur", () => setLocalTyping(false));
   els.sound.addEventListener("click", enableSound);
+  els.messages.addEventListener("scroll", () => {
+    messagesPinned = nearMessagesBottom();
+  });
 
   window.addEventListener("keydown", onKeyDown);
   document.addEventListener("pointerdown", unlockOnGesture, { capture: true, passive: true });
@@ -157,6 +163,70 @@ function wireEvents() {
 function unlockOnGesture() {
   audio.unlock();
   if (els.remoteAudio.srcObject && els.remoteAudio.paused) playRemote();
+}
+
+function watchViewport() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+
+  let frame = 0;
+
+  const apply = () => {
+    frame = 0;
+    const height = Math.round(viewport.height);
+    if (!height) return;
+
+    const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+    const zoomed = viewport.scale > 1.01;
+    const keyboardOpen = !zoomed && height < layoutHeight - 120;
+
+    document.documentElement.style.setProperty("--app-height", height + "px");
+
+    if (keyboardOpen) {
+      document.documentElement.dataset.keyboard = "open";
+    } else {
+      delete document.documentElement.dataset.keyboard;
+    }
+
+    // iOS pans the page to keep the focused field above the keyboard. The
+    // shell is already sized to the visible area, so put the page back at 0.
+    if (keyboardOpen && window.scrollY) window.scrollTo(0, 0);
+  };
+
+  const schedule = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(apply);
+  };
+
+  viewport.addEventListener("resize", schedule);
+  viewport.addEventListener("scroll", schedule);
+  window.addEventListener("resize", schedule);
+  window.addEventListener("orientationchange", schedule);
+  apply();
+}
+
+function watchMessageLog() {
+  if (typeof ResizeObserver !== "function") return;
+
+  let height = els.messages.clientHeight;
+  const observer = new ResizeObserver(() => {
+    const next = els.messages.clientHeight;
+    if (next === height) return;
+    height = next;
+    // The log shrinks when the keyboard opens. If the reader was at the
+    // bottom, keep the latest message in view instead of leaving it behind
+    // the composer.
+    if (messagesPinned) scrollMessagesToBottom();
+  });
+  observer.observe(els.messages);
+}
+
+function nearMessagesBottom(slack = 60) {
+  return els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < slack;
+}
+
+function scrollMessagesToBottom() {
+  els.messages.scrollTop = els.messages.scrollHeight;
 }
 
 function resolveRoom() {
@@ -503,8 +573,7 @@ function appendMessage({ from, text, at, system = false }) {
 
   if (els.chatEmpty) els.chatEmpty.hidden = true;
 
-  const nearBottom =
-    els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 60;
+  const nearBottom = nearMessagesBottom();
 
   const node = document.createElement("div");
   node.className = "message " + (system ? "message--system" : "message--" + from);
@@ -530,7 +599,10 @@ function appendMessage({ from, text, at, system = false }) {
   trimMessageNodes();
 
   if (nearBottom || from === "self" || system) {
-    els.messages.scrollTop = els.messages.scrollHeight;
+    messagesPinned = true;
+    scrollMessagesToBottom();
+  } else {
+    messagesPinned = false;
   }
 }
 
@@ -549,8 +621,10 @@ function formatMessageTime(ms) {
 
 function clearMessages() {
   messages = [];
+  messagesPinned = true;
   for (const node of els.messages.querySelectorAll(".message")) node.remove();
   if (els.chatEmpty) els.chatEmpty.hidden = false;
+  els.messages.scrollTop = 0;
   setPeerTyping(false);
 }
 
