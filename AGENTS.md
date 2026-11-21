@@ -2,22 +2,24 @@
 
 ## What this project is
 
-Walkie Talkie is a low-latency voice chat app for two people (a parent and a kid) playing games together. See `README.md` for goals and constraints.
+Walkie Talkie is a low-latency voice room for a parent and a kid playing games together. `README.md` owns the product goals, commands, limits, and deployment URLs. `docs/CONTRACT.md` freezes the signaling protocol, DOM ids, and debug API. Read it before changing any of those.
 
 ## Current state
 
-A working v1.2. The stack is a dependency-free browser client (plain ES modules, no build step) plus a small Node signaling server using `ws`, with WebRTC audio peer-to-peer plus text chat and typing state over the signaling socket. The page asks for the mic and joins the room on load; there is no start button. `docs/CONTRACT.md` freezes the signaling protocol, DOM ids, and debug API; read it before changing any of those.
+The client is dependency-free ES modules with no build step. The server is Node with `ws`. Audio is peer-to-peer WebRTC. Chat, typing state, and read-aloud share the signaling socket; read-aloud uses browser speech synthesis. The page asks for the mic and joins on load, with no start button.
 
-- `npm start` serves the app on `http://localhost:8787`.
-- `npm test` runs server tests. `npm run test:e2e` runs the Playwright proof harness. `npm run test:latency` runs the real acoustic mouth-to-ear rig.
-- Microphone capture requires a secure context: localhost works, other hosts need HTTPS (`TLS_CERT`/`TLS_KEY`).
-- Mouth-to-ear is measured at about 160 ms, missing the 150 ms target. The bottleneck is the client browser audio pipeline, not signaling.
+`package.json` owns the commands. The main checks are `npm test` for the server, `npm run test:e2e` for the browser proof including iPhone and iPad keyboard layouts, and `npm run test:latency` for the acoustic mouth-to-ear rig.
+
+Microphones need a secure context. localhost works. Any other host needs HTTPS through `TLS_CERT`/`TLS_KEY` or a reverse proxy.
+
+Mouth-to-ear is about 160 ms against a 150 ms target. The remaining delay is in the browser audio pipeline, not signaling.
+
+The app runs on `garage` as the `james` user service `walkie-talkie.service` and on the nix VM as the system service `walkie-talkie.service`. The nix VM serves the public `https://walkie.locationsolve.com` route from its local app. Use the local `deploy-walkie-talkie` skill for a deploy. It runs the checks, ships both hosts, and verifies both URLs.
 
 ## Working agreements
 
-- Low latency is the primary quality bar. Measure it rather than assuming.
-- Keep the client dead simple to use; a kid should be able to start talking in one click.
-- Linux desktop must work. Browser clients are the default path; native clients only if they clearly earn their complexity.
-- Keep signaling minimal and keep audio peer-to-peer where possible.
-- Use `bd` for task tracking if the project adopts Beads; otherwise keep the project's chosen tracker up to date.
+- Low latency is the primary quality bar. Measure it rather than assuming it.
+- Keep the client usable in one click. A kid should be able to start talking without reading instructions.
+- Linux desktop must work. Browser clients are the default path. Add a native client only when it clearly earns its complexity.
+- Keep signaling minimal and audio peer-to-peer where possible.
 - Do not commit or push unless the user asks.
