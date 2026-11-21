@@ -8,6 +8,7 @@ A low-latency voice channel for a parent and kid to talk while playing games tog
 - Opening the page asks for the microphone and joins the room automatically.
 - Click to talk with Space or the Talk key. Click again to close the mic.
 - Send messages back and forth over the same room while you are connected, with a live typing indicator.
+- Turn on **Read aloud** to have new messages from the other person spoken by the browser. The choice is remembered on that device.
 - Audio goes peer-to-peer over WebRTC. The server only handles signaling, chat and typing relay, and static files.
 - No accounts. The room link is the only key.
 
@@ -122,7 +123,7 @@ npx playwright install chromium   # once
 npm run test:e2e
 ```
 
-The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the QR code renders, proves a 390x700 viewport keeps the QR code and message log visible, proves the typing indicator appears and clears, exchanges chat messages both ways, shrinks the visual viewport to simulate an iPhone keyboard and proves the newest messages and composer stay visible, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`.
+The end-to-end harness starts a real server, launches two Chromium contexts with a fake microphone, pairs them without a start click, proves the QR code renders, proves a 390x700 viewport keeps the QR code and message log visible, proves the typing indicator appears and clears, exchanges chat messages both ways, turns the Read aloud setting on and proves incoming messages are sent to the browser voice, turns it off and proves later messages stay silent, shrinks the visual viewport to simulate an iPhone keyboard and proves the newest messages and composer stay visible, clicks to talk, asserts that audio bytes arrive, proves the mic latches open and closed, checks the real Space key, reads network RTT, closes the mic when the peer leaves, has both peers leave and rejoin, and saves a screenshot to `test-results/e2e-live.png`. Headless Chromium has no system voices, so the harness records the utterances the page asks the browser to speak.
 
 ```sh
 npm run screenshots
@@ -141,7 +142,7 @@ Runs the acoustic mouth-to-ear rig. It needs a desktop session, a real microphon
 ```
 client/
   index.html    page shell, message thread, and the DOM contract
-  app.js        UI state, room URLs, WebSocket signaling, chat, typing, click-to-talk
+  app.js        UI state, room URLs, WebSocket signaling, chat, typing, read aloud, click-to-talk
   rtc.js        one audio transceiver, offer/answer, trickle ICE, stats
   audio.js      local and remote level meters
   mark.svg      station mark
@@ -165,6 +166,8 @@ The first person opens the page and gets a random code such as `ABCD-EFGH`. The 
 
 Text messages and typing state use the same signaling socket. The server trims each message, caps it at 2000 characters, and relays it to the other peer with a timestamp. Typing state is relayed as it changes and is not stored. Nothing is echoed to the sender, and both are dropped if nobody else is in the room.
 
+Read aloud is local to the receiving browser. When it is on, an incoming message is passed to the browser's speech synthesis, replacing any message still being spoken so the latest thing said wins. The server never sees the setting and is not involved in speaking.
+
 Rooms are in memory and disappear when the last peer leaves. The server never sees audio, never inspects SDP, and logs no room codes, addresses, message text, or typing state.
 
 ## Design
@@ -179,6 +182,7 @@ The interface is a two-way console: a channel readout, a status rail, a running 
 - Chat is relayed in memory and not stored. A peer who joins later sees only messages sent after they arrive, and there are no delivery receipts.
 - Because the page joins on load, the browser shows the microphone prompt immediately. Some browsers block remote audio until you interact with the page; a "Tap to hear them" button appears when that happens.
 - Chat transits the signaling server, so it is not end-to-end encrypted. Use HTTPS when you are not on localhost.
+- Read aloud uses the browser's built-in speech synthesis. Voice availability and quality follow the operating system; some Linux browsers need `speech-dispatcher` and a voice package installed before any voice is offered.
 - The room code is the only access control. Anyone with the code can take the open slot. There is no join rate limiting.
 - Rooms live in one process. Running multiple servers would require shared signaling state.
 - Two participants only.
@@ -188,4 +192,4 @@ The interface is a two-way console: a channel readout, a status rail, a running 
 
 ## Status
 
-Working v1.2 with voice, text, and typing state. The measured mouth-to-ear latency is about 160 ms, over the 150 ms target. The next useful steps are reducing browser audio latency, splitting the remaining pipeline delay into encode, decode, and output buffering, a global talk-key wrapper for Linux, a TURN deployment recipe with short-lived credentials, and an explicit leave control.
+Working v1.3 with voice, text, typing state, and optional read-aloud messages. The measured mouth-to-ear latency is about 160 ms, over the 150 ms target. The next useful steps are reducing browser audio latency, splitting the remaining pipeline delay into encode, decode, and output buffering, a global talk-key wrapper for Linux, a TURN deployment recipe with short-lived credentials, and an explicit leave control.

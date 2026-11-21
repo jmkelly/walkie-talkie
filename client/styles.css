@@ -645,6 +645,57 @@ body[data-state="reconnecting"] .share {
   background: var(--danger);
 }
 
+.chat-head-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.speak-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--inset);
+  color: var(--ink-muted);
+  font-size: var(--text-micro);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.08s ease;
+}
+
+.speak-toggle svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.speak-toggle:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.speak-toggle:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.speak-toggle[aria-pressed="true"] {
+  border-color: var(--signal-line);
+  background: var(--signal-soft);
+  color: var(--signal);
+}
+
+.speak-toggle[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--signal-hover);
+}
+
 .messages {
   display: flex;
   flex: 1 1 auto;
